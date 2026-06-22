@@ -240,7 +240,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setTrustedSources(prev => [...prev, updatedPaper]);
         setStagedSources(prev => prev.filter(p => p.id !== id));
         if (activeStagedPaper?.id === id) {
-          setActiveStagedPaperState(null);
+          setActiveStagedPaperState(updatedPaper);
         }
       }
     } catch (err) {
@@ -248,11 +248,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // 6. Discard staged paper
+  // 6. Discard staged or promoted paper
   const discardStagedPaper = async (id: string) => {
     try {
       await deleteSource(id);
       setStagedSources(prev => prev.filter(p => p.id !== id));
+      setTrustedSources(prev => prev.filter(p => p.id !== id));
       if (activeStagedPaper?.id === id) {
         setActiveStagedPaperState(null);
       }
@@ -378,11 +379,11 @@ CRITICAL INSTRUCTIONS:
     }
   };
 
-  // 8. Grounded chat message in specific staged paper preview
+  // 8. Grounded chat message in specific staged or promoted paper preview
   const sendStagedPaperMessage = async (paperId: string, text: string) => {
     if (!text.trim() || isChatting) return;
 
-    const paper = stagedSources.find(p => p.id === paperId);
+    const paper = stagedSources.find(p => p.id === paperId) || trustedSources.find(p => p.id === paperId);
     if (!paper) return;
 
     setIsChatting(true);
@@ -426,15 +427,15 @@ CRITICAL INSTRUCTIONS:
         docContext += `\nAbstract:\n${paper.abstract}\n`;
       }
 
-      const systemInstruction = `You are a research analyst reviewing a STAGED (unverified) paper.
+      const isPromoted = paper.status === 'promoted';
+      const systemInstruction = `You are a research analyst reviewing a ${isPromoted ? 'promoted notebook' : 'staged (unverified)'} paper.
 Your goal is to answer questions ONLY about this specific paper: "${paper.title}".
 
 CRITICAL INSTRUCTIONS:
 1. Ground your answers strictly in the document details provided below.
-2. If the user asks general research questions, remind them that this paper is staged and they must promote it to the notebook to combine it with other sources.
-3. Be precise, objective, and cite only this document.
+${isPromoted ? '' : '2. If the user asks general research questions, remind them that this paper is staged and they must promote it to the notebook to combine it with other sources.\n'}3. Be precise, objective, and cite only this document.
 
-Staged Paper Details:
+Paper Details:
 ${docContext}
 `;
 

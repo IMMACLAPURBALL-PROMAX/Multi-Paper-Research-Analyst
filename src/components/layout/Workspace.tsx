@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { WorkspaceProvider } from '@/context/WorkspaceContext';
 import { TrustedPanel } from '@/components/documents/TrustedPanel';
 import { ResearchPanel } from '@/components/documents/ResearchPanel';
+import { PreviewDrawer } from '@/components/documents/PreviewDrawer';
 import { MainChat } from '@/components/chat/MainChat';
 import { MindMapCanvas } from '@/components/visualization/MindMapCanvas';
 import { KeyConfigModal } from '@/components/layout/KeyConfigModal';
@@ -45,6 +46,8 @@ export const Workspace: React.FC = () => {
               <ResearchPanel />
             )}
           </div>
+
+          <PreviewDrawer />
         </div>
 
         {/* Center Column - Grounded Chat */}
@@ -84,6 +87,7 @@ export const Workspace: React.FC = () => {
         .left-col {
           border-right: 1px solid var(--border-color);
           background: rgba(10, 15, 29, 0.5);
+          position: relative;
         }
         
         .center-col {

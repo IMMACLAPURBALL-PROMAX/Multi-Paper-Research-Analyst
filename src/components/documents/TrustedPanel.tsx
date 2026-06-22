@@ -16,7 +16,9 @@ export const TrustedPanel: React.FC<TrustedPanelProps> = ({ onOpenSettings }) =>
     uploadProgress, 
     discardStagedPaper,
     apiKeys,
-    modelConfig
+    modelConfig,
+    activeStagedPaper,
+    setActiveStagedPaper
   } = useWorkspace();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -116,7 +118,12 @@ export const TrustedPanel: React.FC<TrustedPanelProps> = ({ onOpenSettings }) =>
         ) : (
           <div className="sources-scroll">
             {trustedSources.map((doc) => (
-              <div key={doc.id} className="source-item animate-fade-in">
+              <div 
+                key={doc.id} 
+                className={`source-item animate-fade-in ${activeStagedPaper?.id === doc.id ? 'active' : ''}`}
+                onClick={() => setActiveStagedPaper(doc)}
+                style={{ cursor: 'pointer' }}
+              >
                 <div className="source-info">
                   <h3 className="source-title" title={doc.title}>{doc.title}</h3>
                   <p className="source-meta">
@@ -128,7 +135,10 @@ export const TrustedPanel: React.FC<TrustedPanelProps> = ({ onOpenSettings }) =>
                 </div>
                 <button 
                   className="btn-delete" 
-                  onClick={() => discardStagedPaper(doc.id)} 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    discardStagedPaper(doc.id);
+                  }} 
                   title="Remove from notebook"
                 >
                   <Trash2 size={14} />
@@ -369,6 +379,11 @@ export const TrustedPanel: React.FC<TrustedPanelProps> = ({ onOpenSettings }) =>
         .source-item:hover {
           border-color: rgba(99, 102, 241, 0.2);
           background: rgba(99, 102, 241, 0.02);
+        }
+        .source-item.active {
+          border-color: var(--color-brand);
+          background: rgba(99, 102, 241, 0.08);
+          box-shadow: 0 0 10px rgba(99, 102, 241, 0.05);
         }
         .source-info {
           flex-grow: 1;
