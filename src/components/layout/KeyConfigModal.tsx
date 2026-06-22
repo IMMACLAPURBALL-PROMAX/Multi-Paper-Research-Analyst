@@ -30,10 +30,12 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
   const [geminiKey, setGeminiKey] = useState(apiKeys.gemini || '');
   const [claudeKey, setClaudeKey] = useState(apiKeys.claude || '');
   const [openaiKey, setOpenaiKey] = useState(apiKeys.openai || '');
+  const [semanticScholarKey, setSemanticScholarKey] = useState(apiKeys.semanticScholar || '');
   
   const [showGemini, setShowGemini] = useState(false);
   const [showClaude, setShowClaude] = useState(false);
   const [showOpenai, setShowOpenai] = useState(false);
+  const [showSemanticScholar, setShowSemanticScholar] = useState(false);
   
   const [provider, setProvider] = useState(modelConfig.provider);
   const [model, setModel] = useState(modelConfig.model);
@@ -44,6 +46,7 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
       setGeminiKey(apiKeys.gemini || '');
       setClaudeKey(apiKeys.claude || '');
       setOpenaiKey(apiKeys.openai || '');
+      setSemanticScholarKey(apiKeys.semanticScholar || '');
       setProvider(modelConfig.provider);
       setModel(modelConfig.model);
     }
@@ -60,7 +63,8 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
     updateApiKeys({
       gemini: geminiKey.trim() || undefined,
       claude: claudeKey.trim() || undefined,
-      openai: openaiKey.trim() || undefined
+      openai: openaiKey.trim() || undefined,
+      semanticScholar: semanticScholarKey.trim() || undefined
     });
     
     updateModelConfig({
@@ -190,6 +194,32 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
                   {showOpenai ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+            </div>
+
+            {/* Semantic Scholar key */}
+            <div className="input-key-wrapper">
+              <div className="key-header">
+                <label>Semantic Scholar API Key (Optional)</label>
+                {semanticScholarKey && <span className="key-indicator active">Configured</span>}
+              </div>
+              <div className="input-action-row">
+                <input
+                  type={showSemanticScholar ? 'text' : 'password'}
+                  placeholder="Enter Semantic Scholar Key..."
+                  value={semanticScholarKey}
+                  onChange={(e) => setSemanticScholarKey(e.target.value)}
+                />
+                <button 
+                  className="btn-eye" 
+                  onClick={() => setShowSemanticScholar(!showSemanticScholar)}
+                  title={showSemanticScholar ? "Hide Key" : "Show Key"}
+                >
+                  {showSemanticScholar ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <p style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                Used to bypass global rate-limiting when searching non-physics business papers.
+              </p>
             </div>
           </div>
         </div>

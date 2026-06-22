@@ -33,6 +33,7 @@ export interface APIKeys {
   gemini?: string;
   claude?: string;
   openai?: string;
+  semanticScholar?: string;
 }
 
 export interface ModelConfig {

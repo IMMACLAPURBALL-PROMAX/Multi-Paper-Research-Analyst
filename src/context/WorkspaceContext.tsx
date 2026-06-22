@@ -187,11 +187,25 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsSearching(true);
     setSearchError(null);
     try {
-      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=12`);
+      const headers: Record<string, string> = {};
+      if (apiKeys.semanticScholar) {
+        headers['x-semanticscholar-key'] = apiKeys.semanticScholar;
+      }
+      
+      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=12`, {
+        headers
+      });
+      
       if (!response.ok) {
         throw new Error('Search failed to execute.');
       }
+      
       const data = await response.json();
+      
+      if (data.warning) {
+        setSearchError(data.warning);
+      }
+      
       const papers: DocumentSource[] = data.papers || [];
 
       // Save found papers to staging area in database

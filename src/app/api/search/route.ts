@@ -96,12 +96,16 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q');
   const limit = parseInt(searchParams.get('limit') || '10', 10);
+  
+  // Read Semantic Scholar Key from headers
+  const s2Key = request.headers.get('x-semanticscholar-key') || undefined;
 
   if (!query) {
     return NextResponse.json({ error: 'Search query parameter "q" is required.' }, { status: 400 });
   }
 
   const normalizedQuery = query.trim();
+  let s2Warning: string | null = null;
 
   // Run search on arXiv and Semantic Scholar in parallel (with try-catch safety)
   const [arxivResults, s2Results] = await Promise.all([
@@ -109,8 +113,13 @@ export async function GET(request: Request) {
       console.error('arXiv Search Error:', err);
       return [];
     }),
-    fetchSemanticScholar(normalizedQuery, limit).catch(err => {
+    fetchSemanticScholar(normalizedQuery, limit, s2Key).catch(err => {
       console.error('Semantic Scholar Search Error:', err);
+      if (err.message?.includes('429')) {
+        s2Warning = 'Semantic Scholar rate limit exceeded (429). Please wait a few minutes or add a Semantic Scholar API Key in Settings to search business papers.';
+      } else {
+        s2Warning = err.message || 'Semantic Scholar search failed.';
+      }
       return [];
     })
   ]);
@@ -148,7 +157,10 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ papers: mergedPapers.slice(0, limit) });
+  return NextResponse.json({ 
+    papers: mergedPapers.slice(0, limit),
+    warning: s2Warning
+  });
 }
 
 // Fetch helper for arXiv API
@@ -172,16 +184,22 @@ async function fetchArxiv(query: string, limit: number): Promise<DocumentSource[
 }
 
 // Fetch helper for Semantic Scholar API
-async function fetchSemanticScholar(query: string, limit: number): Promise<DocumentSource[]> {
+async function fetchSemanticScholar(query: string, limit: number, apiKey?: string): Promise<DocumentSource[]> {
   const fields = 'title,authors,year,citationCount,venue,publicationDate,abstract,url,openAccessPdf';
   const searchUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=${limit}&fields=${fields}`;
   
+  const headers: Record<string, string> = {
+    'Accept': 'application/json',
+    'User-Agent': 'MultiPaperResearchAnalyst/1.0'
+  };
+
+  if (apiKey) {
+    headers['x-api-key'] = apiKey;
+  }
+
   const response = await fetch(searchUrl, {
     method: 'GET',
-    headers: {
-      'Accept': 'application/json',
-      'User-Agent': 'MultiPaperResearchAnalyst/1.0'
-    },
+    headers,
     next: { revalidate: 60 }
   });
 
