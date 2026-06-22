@@ -37,7 +37,7 @@ interface WorkspaceContextProps {
   searchPapers: (query: string) => Promise<DocumentSource[]>;
   promotePaperToTrusted: (id: string) => Promise<void>;
   discardStagedPaper: (id: string) => Promise<void>;
-  sendWorkspaceMessage: (text: string) => Promise<void>;
+  sendWorkspaceMessage: (text: string, image?: string) => Promise<void>;
   sendStagedPaperMessage: (paperId: string, text: string) => Promise<void>;
   clearWorkspaceChat: () => Promise<void>;
 }
@@ -46,7 +46,9 @@ const WorkspaceContext = createContext<WorkspaceContextProps | undefined>(undefi
 
 const defaultModelConfig: ModelConfig = {
   provider: 'gemini',
-  model: 'gemini-1.5-flash',
+  model: 'gemini-3.5-flash',
+  temperature: 0.2,
+  maxTokens: 2048,
 };
 
 const WORKSPACE_ID = 'default-workspace'; // Supporting single workspace for simplicity
@@ -275,7 +277,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         messages,
         systemInstruction,
         provider: modelConfig.provider,
-        model: modelConfig.model
+        model: modelConfig.model,
+        temperature: modelConfig.temperature,
+        maxTokens: modelConfig.maxTokens
       })
     });
 
@@ -287,8 +291,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   // 7. Grounded chat message in main workspace (trusted sources only)
-  const sendWorkspaceMessage = async (text: string) => {
-    if (!text.trim() || isChatting) return;
+  const sendWorkspaceMessage = async (text: string, image?: string) => {
+    if ((!text.trim() && !image) || isChatting) return;
 
     setIsChatting(true);
     setChatError(null);
@@ -298,7 +302,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       id: `msg_${Date.now()}`,
       sender: 'user',
       content: text,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      image
     };
 
     // Prepend user message to local state immediately for responsiveness

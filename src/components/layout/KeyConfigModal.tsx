@@ -11,8 +11,8 @@ interface KeyConfigModalProps {
 
 const MODELS_BY_PROVIDER = {
   gemini: [
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Fast, cost-effective)' },
-    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Deep context & reasoning)' },
+    { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash (Fast, balanced, multimodal)' },
+    { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview (Complex reasoning, coding)' },
   ],
   claude: [
     { id: 'claude-3-5-sonnet-latest', name: 'Claude 3.5 Sonnet (State-of-the-art analysis)' },
@@ -39,6 +39,8 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
   
   const [provider, setProvider] = useState(modelConfig.provider);
   const [model, setModel] = useState(modelConfig.model);
+  const [temperature, setTemperature] = useState(modelConfig.temperature ?? 0.2);
+  const [maxTokens, setMaxTokens] = useState(modelConfig.maxTokens ?? 2048);
 
   // Sync state with Context when open
   useEffect(() => {
@@ -49,6 +51,8 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
       setSemanticScholarKey(apiKeys.semanticScholar || '');
       setProvider(modelConfig.provider);
       setModel(modelConfig.model);
+      setTemperature(modelConfig.temperature ?? 0.2);
+      setMaxTokens(modelConfig.maxTokens ?? 2048);
     }
   }, [isOpen, apiKeys, modelConfig]);
 
@@ -69,7 +73,9 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
     
     updateModelConfig({
       provider,
-      model
+      model,
+      temperature,
+      maxTokens
     });
     
     onClose();
@@ -118,6 +124,38 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
                       {m.name}
                     </option>
                   ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="params-row" style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
+              <div className="select-wrapper flex-grow" style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label>Temperature: {temperature}</label>
+                </div>
+                <input
+                  type="range"
+                  min="0.0"
+                  max="1.5"
+                  step="0.1"
+                  value={temperature}
+                  onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                  style={{ width: '100%', marginTop: '6px' }}
+                />
+              </div>
+              
+              <div className="select-wrapper" style={{ display: 'flex', flexDirection: 'column', width: '180px' }}>
+                <label>Max Tokens</label>
+                <select 
+                  value={maxTokens} 
+                  onChange={(e) => setMaxTokens(parseInt(e.target.value, 10))}
+                  style={{ marginTop: '4px' }}
+                >
+                  <option value="256">256 (Very Short)</option>
+                  <option value="512">512 (Short Summary)</option>
+                  <option value="1024">1024 (Standard)</option>
+                  <option value="2048">2048 (Long Response)</option>
+                  <option value="4096">4096 (Maximum)</option>
                 </select>
               </div>
             </div>

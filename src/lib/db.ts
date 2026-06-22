@@ -9,6 +9,7 @@ export interface DBMessage {
   content: string;
   timestamp: number;
   sources?: Array<{ id: string; title: string }>;
+  image?: string; // Optional Base64 data URL
 }
 
 class ResearchDatabase extends Dexie {

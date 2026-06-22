@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspace } from '@/context/WorkspaceContext';
-import { Send, Sparkles, Trash2, ShieldAlert, Cpu, Layers } from 'lucide-react';
+import { Send, Sparkles, Trash2, ShieldAlert, Cpu, Layers, Paperclip, X, Image as ImageIcon } from 'lucide-react';
 
 export const MainChat: React.FC = () => {
   const { 
@@ -17,19 +17,42 @@ export const MainChat: React.FC = () => {
   } = useWorkspace();
 
   const [input, setInput] = useState('');
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [mainChatHistory, isChatting]);
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Please select a valid image file (PNG/JPG/WEBP).');
+        return;
+      }
+      // Read file client-side as base64 Data URL
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAttachedImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isChatting) return;
+    if ((!input.trim() && !attachedImage) || isChatting) return;
+    
     const textToSend = input;
+    const imageToSend = attachedImage || undefined;
+    
     setInput('');
-    await sendWorkspaceMessage(textToSend);
+    setAttachedImage(null);
+    
+    await sendWorkspaceMessage(textToSend, imageToSend);
   };
 
   // Estimate total tokens in active workspace (Sources content + Chat history)
@@ -110,6 +133,11 @@ export const MainChat: React.FC = () => {
                   {msg.sender === 'user' ? 'You' : `${modelConfig.provider.toUpperCase()} Assistant`}
                 </div>
                 <div className="message-bubble">
+                  {msg.image && (
+                    <div className="message-image-wrapper">
+                      <img src={msg.image} className="message-image" alt="Attached diagram" />
+                    </div>
+                  )}
                   <p className="message-content">{msg.content}</p>
                   
                   {/* Grounded references list */}
@@ -158,7 +186,43 @@ export const MainChat: React.FC = () => {
 
       {/* 4. Input Area */}
       <div className="input-area">
+        {/* Attached image preview */}
+        {attachedImage && (
+          <div className="image-preview-bar animate-fade-in">
+            <div className="preview-thumbnail-wrapper">
+              <img src={attachedImage} className="preview-thumbnail" alt="Selected Attachment" />
+              <button 
+                type="button" 
+                className="btn-remove-preview" 
+                onClick={() => setAttachedImage(null)}
+                title="Remove image"
+              >
+                <X size={12} />
+              </button>
+            </div>
+            <span className="preview-filename">Image file attached</span>
+          </div>
+        )}
+
         <form onSubmit={handleSend} className="input-form">
+          <input
+            type="file"
+            accept="image/*"
+            ref={fileInputRef}
+            onChange={handleImageChange}
+            style={{ display: 'none' }}
+          />
+
+          <button
+            type="button"
+            className="btn-attach"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isChatting || !hasKeys || trustedSources.length === 0}
+            title="Attach image or chart"
+          >
+            <Paperclip size={16} />
+          </button>
+
           <input
             type="text"
             placeholder={
@@ -166,16 +230,17 @@ export const MainChat: React.FC = () => {
                 ? "Please configure your API keys first..."
                 : trustedSources.length === 0
                 ? "Promote papers to your notebook to enable chat..."
-                : "Ask about your papers..."
+                : "Ask about your papers (or charts)..."
             }
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={isChatting || !hasKeys || trustedSources.length === 0}
+            style={{ paddingLeft: '44px' }}
           />
           <button 
             type="submit" 
             className="btn-send"
-            disabled={!input.trim() || isChatting || !hasKeys || trustedSources.length === 0}
+            disabled={(!input.trim() && !attachedImage) || isChatting || !hasKeys || trustedSources.length === 0}
           >
             <Send size={15} />
           </button>
@@ -478,6 +543,92 @@ export const MainChat: React.FC = () => {
           gap: 4px;
           font-weight: 600;
           color: var(--text-secondary);
+        }
+
+        /* Image Attachment & Preview Styles */
+        .image-preview-bar {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          background: rgba(15, 23, 42, 0.6);
+          border: 1px solid var(--border-color);
+          border-bottom: none;
+          padding: 8px 12px;
+          border-top-left-radius: var(--radius-md);
+          border-top-right-radius: var(--radius-md);
+        }
+        .preview-thumbnail-wrapper {
+          position: relative;
+          width: 40px;
+          height: 40px;
+          border-radius: var(--radius-sm);
+          border: 1px solid var(--border-color);
+          overflow: hidden;
+        }
+        .preview-thumbnail {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .btn-remove-preview {
+          position: absolute;
+          top: 2px;
+          right: 2px;
+          width: 14px;
+          height: 14px;
+          background: rgba(0, 0, 0, 0.7);
+          color: #fff;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          transition: background var(--transition-fast);
+        }
+        .btn-remove-preview:hover {
+          background: var(--color-danger);
+        }
+        .preview-filename {
+          font-size: 11px;
+          color: var(--text-secondary);
+          font-weight: 500;
+        }
+        .btn-attach {
+          position: absolute;
+          left: 10px;
+          top: 10px;
+          width: 24px;
+          height: 24px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--text-secondary);
+          border-radius: var(--radius-sm);
+          z-index: 5;
+        }
+        .btn-attach:hover:not(:disabled) {
+          background: rgba(148, 163, 184, 0.08);
+          color: var(--text-primary);
+        }
+        .btn-attach:disabled {
+          opacity: 0.3;
+          cursor: not-allowed;
+        }
+        
+        .message-image-wrapper {
+          margin-bottom: 8px;
+          max-width: 320px;
+          border-radius: var(--radius-md);
+          overflow: hidden;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .message-image {
+          width: 100%;
+          height: auto;
+          display: block;
+          max-height: 200px;
+          object-fit: contain;
+          background: #000;
         }
       `}</style>
     </div>

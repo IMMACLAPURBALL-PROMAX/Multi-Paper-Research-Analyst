@@ -27,6 +27,7 @@ export interface ChatMessage {
   timestamp: number;
   // Documents referenced in grounding
   sources?: Array<{ id: string; title: string }>;
+  image?: string; // Optional Base64 Data URL
 }
 
 export interface APIKeys {
@@ -39,6 +40,8 @@ export interface APIKeys {
 export interface ModelConfig {
   provider: 'gemini' | 'claude' | 'openai';
   model: string;
+  temperature: number;
+  maxTokens: number;
 }
 
 export interface Workspace {

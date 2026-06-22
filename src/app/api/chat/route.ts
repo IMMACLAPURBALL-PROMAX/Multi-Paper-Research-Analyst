@@ -3,7 +3,13 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { messages, systemInstruction, provider, model } = body;
+    const { messages, systemInstruction, provider, temperature, maxTokens } = body;
+    let { model } = body;
+
+    // Normalize any copy-pasted en-dash (U+2013) or em-dash (U+2014) to standard hyphen
+    if (model) {
+      model = model.replace(/[\u2013\u2014]/g, '-').trim();
+    }
 
     // Retrieve keys from headers
     const geminiKey = request.headers.get('x-gemini-key');
@@ -26,21 +32,21 @@ export async function POST(request: Request) {
       if (!geminiKey) {
         return NextResponse.json({ error: 'Gemini API Key is missing. Please configure it in Settings.' }, { status: 400 });
       }
-      return await handleGemini(geminiKey, model, messages, systemInstruction);
+      return await handleGemini(geminiKey, model, messages, systemInstruction, temperature, maxTokens);
     } 
     
     if (provider === 'claude') {
       if (!anthropicKey) {
         return NextResponse.json({ error: 'Claude API Key is missing. Please configure it in Settings.' }, { status: 400 });
       }
-      return await handleClaude(anthropicKey, model, messages, systemInstruction);
+      return await handleClaude(anthropicKey, model, messages, systemInstruction, temperature, maxTokens);
     } 
     
     if (provider === 'openai') {
       if (!openaiKey) {
         return NextResponse.json({ error: 'OpenAI API Key is missing. Please configure it in Settings.' }, { status: 400 });
       }
-      return await handleOpenAI(openaiKey, model, messages, systemInstruction);
+      return await handleOpenAI(openaiKey, model, messages, systemInstruction, temperature, maxTokens);
     }
 
     return NextResponse.json({ error: `Unsupported provider: ${provider}` }, { status: 400 });
@@ -51,21 +57,48 @@ export async function POST(request: Request) {
   }
 }
 
-// 1. Google Gemini API Handler
-async function handleGemini(apiKey: string, model: string, messages: any[], systemInstruction?: string) {
-  // Convert messages to Gemini format (user -> user, assistant -> model)
-  const contents = messages.map(msg => ({
-    role: msg.sender === 'assistant' ? 'model' : 'user',
-    parts: [{ text: msg.content }]
-  }));
+// 1. Google Gemini API Handler (Multimodal)
+async function handleGemini(
+  apiKey: string, 
+  model: string, 
+  messages: any[], 
+  systemInstruction?: string,
+  temperature?: number,
+  maxTokens?: number
+) {
+  // Convert messages to Gemini format (user -> user, assistant -> model, with multimodal support)
+  const contents = messages.map(msg => {
+    const parts = [{ text: msg.content }];
+    
+    if (msg.image) {
+      try {
+        const [mimePart, base64Data] = msg.image.split(';base64,');
+        const mimeType = mimePart.split('data:').pop() || 'image/jpeg';
+        parts.push({
+          inlineData: {
+            mimeType,
+            data: base64Data
+          }
+        } as any);
+      } catch (err) {
+        console.error('Failed to parse base64 image for Gemini:', err);
+      }
+    }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    return {
+      role: msg.sender === 'assistant' ? 'model' : 'user',
+      parts
+    };
+  });
+
+  // Switch to the stable v1 endpoint for stable models like gemini-1.5-flash
+  const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`;
 
   const payload: any = {
     contents,
     generationConfig: {
-      temperature: 0.2,
-      maxOutputTokens: 2048,
+      temperature: temperature ?? 0.2,
+      maxOutputTokens: maxTokens ?? 2048,
     }
   };
 
@@ -93,21 +126,55 @@ async function handleGemini(apiKey: string, model: string, messages: any[], syst
   return NextResponse.json({ content: text });
 }
 
-// 2. Anthropic Claude API Handler
-async function handleClaude(apiKey: string, model: string, messages: any[], systemInstruction?: string) {
-  // Convert messages to Claude format
-  const formattedMessages = messages.map(msg => ({
-    role: msg.sender === 'assistant' ? 'assistant' : 'user',
-    content: msg.content
-  }));
+// 2. Anthropic Claude API Handler (Multimodal)
+async function handleClaude(
+  apiKey: string, 
+  model: string, 
+  messages: any[], 
+  systemInstruction?: string,
+  temperature?: number,
+  maxTokens?: number
+) {
+  // Convert messages to Claude format with multimodal support
+  const formattedMessages = messages.map(msg => {
+    let content: any = msg.content;
+    
+    if (msg.image) {
+      try {
+        const [mimePart, base64Data] = msg.image.split(';base64,');
+        const media_type = mimePart.split('data:').pop() || 'image/jpeg';
+        content = [
+          {
+            type: 'text',
+            text: msg.content
+          },
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type,
+              data: base64Data
+            }
+          }
+        ];
+      } catch (err) {
+        console.error('Failed to parse base64 image for Claude:', err);
+      }
+    }
+
+    return {
+      role: msg.sender === 'assistant' ? 'assistant' : 'user',
+      content
+    };
+  });
 
   const url = 'https://api.anthropic.com/v1/messages';
 
   const payload: any = {
     model,
-    max_tokens: 2048,
+    max_tokens: maxTokens ?? 2048,
     messages: formattedMessages,
-    temperature: 0.2
+    temperature: temperature ?? 0.2
   };
 
   if (systemInstruction) {
@@ -136,9 +203,16 @@ async function handleClaude(apiKey: string, model: string, messages: any[], syst
   return NextResponse.json({ content: text });
 }
 
-// 3. OpenAI API Handler
-async function handleOpenAI(apiKey: string, model: string, messages: any[], systemInstruction?: string) {
-  // Convert messages to OpenAI format
+// 3. OpenAI API Handler (Multimodal)
+async function handleOpenAI(
+  apiKey: string, 
+  model: string, 
+  messages: any[], 
+  systemInstruction?: string,
+  temperature?: number,
+  maxTokens?: number
+) {
+  // Convert messages to OpenAI format with multimodal support
   const formattedMessages = [];
   
   if (systemInstruction) {
@@ -148,18 +222,37 @@ async function handleOpenAI(apiKey: string, model: string, messages: any[], syst
     });
   }
 
-  formattedMessages.push(...messages.map(msg => ({
-    role: msg.sender === 'assistant' ? 'assistant' : 'user',
-    content: msg.content
-  })));
+  formattedMessages.push(...messages.map(msg => {
+    let content: any = msg.content;
+    
+    if (msg.image) {
+      content = [
+        {
+          type: 'text',
+          text: msg.content
+        },
+        {
+          type: 'image_url',
+          image_url: {
+            url: msg.image // OpenAI natively accepts the entire data URL (data:image/jpeg;base64,...)
+          }
+        }
+      ];
+    }
+
+    return {
+      role: msg.sender === 'assistant' ? 'assistant' : 'user',
+      content
+    };
+  }));
 
   const url = 'https://api.openai.com/v1/chat/completions';
 
   const payload = {
     model,
     messages: formattedMessages,
-    temperature: 0.2,
-    max_tokens: 2048
+    temperature: temperature ?? 0.2,
+    max_tokens: maxTokens ?? 2048
   };
 
   const response = await fetch(url, {
