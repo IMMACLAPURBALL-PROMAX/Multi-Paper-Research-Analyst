@@ -183,8 +183,37 @@ async function fetchArxiv(query: string, limit: number): Promise<DocumentSource[
   return parseArxivXml(xmlText);
 }
 
-// Fetch helper for Semantic Scholar API
+let s2RequestQueue = Promise.resolve();
+let lastS2RequestTime = 0;
+
+// Fetch helper for Semantic Scholar API with rate limiting
 async function fetchSemanticScholar(query: string, limit: number, apiKey?: string): Promise<DocumentSource[]> {
+  return new Promise<DocumentSource[]>((resolve, reject) => {
+    s2RequestQueue = s2RequestQueue
+      .then(async () => {
+        try {
+          const now = Date.now();
+          const timeSinceLast = now - lastS2RequestTime;
+          if (timeSinceLast < 1000) {
+            const delay = 1000 - timeSinceLast;
+            await new Promise(r => setTimeout(r, delay));
+          }
+          lastS2RequestTime = Date.now();
+          const res = await fetchSemanticScholarRaw(query, limit, apiKey);
+          resolve(res);
+        } catch (err) {
+          reject(err);
+        }
+      })
+      .catch((err) => {
+        // Prevent broken queue links, fallback so future queries still execute
+        reject(err);
+      });
+  });
+}
+
+// Raw fetch logic for Semantic Scholar API
+async function fetchSemanticScholarRaw(query: string, limit: number, apiKey?: string): Promise<DocumentSource[]> {
   const fields = 'title,authors,year,citationCount,venue,publicationDate,abstract,url,openAccessPdf';
   const searchUrl = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(query)}&limit=${limit}&fields=${fields}`;
   
