@@ -194,8 +194,8 @@ async function fetchSemanticScholar(query: string, limit: number, apiKey?: strin
         try {
           const now = Date.now();
           const timeSinceLast = now - lastS2RequestTime;
-          if (timeSinceLast < 1000) {
-            const delay = 1000 - timeSinceLast;
+          if (timeSinceLast < 1200) {
+            const delay = 1200 - timeSinceLast;
             await new Promise(r => setTimeout(r, delay));
           }
           lastS2RequestTime = Date.now();
