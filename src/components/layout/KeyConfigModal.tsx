@@ -3,27 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { Settings, X, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { getAvailableModels } from '@/lib/models';
 
 interface KeyConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const MODELS_BY_PROVIDER = {
-  gemini: [
-    { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash (Fast, balanced, multimodal)' },
-    { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite (Fastest, cost-efficient, stable)' },
-    { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview (Complex reasoning, coding)' },
-  ],
-  claude: [
-    { id: 'claude-3-5-sonnet-latest', name: 'Claude 3.5 Sonnet (State-of-the-art analysis)' },
-    { id: 'claude-3-5-haiku-latest', name: 'Claude 3.5 Haiku (Ultra-fast reasoning)' }
-  ],
-  openai: [
-    { id: 'gpt-4o', name: 'GPT-4o (High intelligence multimodal)' },
-    { id: 'gpt-4o-mini', name: 'GPT-4o Mini (Cost-efficient lightweight)' }
-  ]
-};
+
 
 const THEMES = {
   purple: { label: 'Indigo', brand: '#6366f1' },
@@ -69,11 +56,28 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
     }
   }, [isOpen, apiKeys, modelConfig]);
 
-  // Handle provider change -> reset model to first option
-  const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextProvider = e.target.value as 'gemini' | 'claude' | 'openai';
-    setProvider(nextProvider);
-    setModel(MODELS_BY_PROVIDER[nextProvider][0].id);
+  // Sync selected model with available models list
+  useEffect(() => {
+    const models = getAvailableModels({
+      gemini: geminiKey,
+      claude: claudeKey,
+      openai: openaiKey
+    });
+    if (models.length > 0) {
+      const exists = models.some(m => m.id === model && m.provider === provider);
+      if (!exists) {
+        setProvider(models[0].provider);
+        setModel(models[0].id);
+      }
+    }
+  }, [geminiKey, claudeKey, openaiKey, model, provider]);
+
+  const handleModelSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const [selectedProvider, selectedId] = e.target.value.split(':');
+    if (selectedProvider && selectedId) {
+      setProvider(selectedProvider as any);
+      setModel(selectedId);
+    }
   };
 
   const handleSave = () => {
@@ -120,24 +124,21 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
           <div className="form-group">
             <h3>1. Select Active AI Model</h3>
             <div className="model-selector-row">
-              <div className="select-wrapper">
-                <label>Provider</label>
-                <select value={provider} onChange={handleProviderChange}>
-                  <option value="gemini">Google Gemini</option>
-                  <option value="claude">Anthropic Claude</option>
-                  <option value="openai">OpenAI</option>
-                </select>
-              </div>
-              
               <div className="select-wrapper flex-grow">
-                <label>Model Variant</label>
-                <select value={model} onChange={(e) => setModel(e.target.value)}>
-                  {MODELS_BY_PROVIDER[provider].map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
+                <label>Active Model</label>
+                {getAvailableModels({ gemini: geminiKey, claude: claudeKey, openai: openaiKey }).length > 0 ? (
+                  <select value={`${provider}:${model}`} onChange={handleModelSelectChange}>
+                    {getAvailableModels({ gemini: geminiKey, claude: claudeKey, openai: openaiKey }).map((m) => (
+                      <option key={`${m.provider}:${m.id}`} value={`${m.provider}:${m.id}`}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <select disabled>
+                    <option value="">No keys configured (Setup keys below to unlock models)</option>
+                  </select>
+                )}
               </div>
             </div>
 

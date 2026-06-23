@@ -246,7 +246,10 @@ async function handleOpenAI(
     };
   }));
 
-  const url = 'https://api.openai.com/v1/chat/completions';
+  let url = 'https://api.openai.com/v1/chat/completions';
+  if (apiKey.startsWith('ghp_') || apiKey.startsWith('github_pat_')) {
+    url = 'https://models.inference.ai.azure.com/chat/completions';
+  }
 
   const payload = {
     model,
@@ -268,7 +271,7 @@ async function handleOpenAI(
 
   if (!response.ok) {
     return NextResponse.json({ 
-      error: resJson.error?.message || `OpenAI API returned status ${response.status}` 
+      error: resJson.error?.message || `OpenAI/GitHub Models API returned status ${response.status}` 
     }, { status: response.status });
   }
 

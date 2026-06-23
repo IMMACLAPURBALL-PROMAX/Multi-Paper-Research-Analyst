@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { Send, Sparkles, Trash2, ShieldAlert, Cpu, Layers, Paperclip, X, Image as ImageIcon, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { renderMarkdown } from '@/lib/markdown';
+import { getAvailableModels } from '@/lib/models';
 
 export const MainChat: React.FC = () => {
   const { 
@@ -15,9 +16,27 @@ export const MainChat: React.FC = () => {
     trustedSources,
     apiKeys,
     modelConfig,
+    updateModelConfig,
     activeCenterTab,
     setActiveCenterTab
   } = useWorkspace();
+
+  const availableModels = getAvailableModels(apiKeys);
+
+  const activeModelValue = availableModels.some(m => m.id === modelConfig.model && m.provider === modelConfig.provider)
+    ? `${modelConfig.provider}:${modelConfig.model}`
+    : availableModels.length > 0 ? `${availableModels[0].provider}:${availableModels[0].id}` : '';
+
+  const handleModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const [selectedProvider, selectedId] = e.target.value.split(':');
+    if (selectedProvider && selectedId) {
+      updateModelConfig({
+        ...modelConfig,
+        provider: selectedProvider as any,
+        model: selectedId
+      });
+    }
+  };
 
   const [input, setInput] = useState('');
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
@@ -109,6 +128,28 @@ export const MainChat: React.FC = () => {
         </div>
         
         <div className="header-actions">
+          {/* Dynamic Model Selector */}
+          <div className="model-selector-container" title="Select active AI model">
+            <Cpu size={12} className="model-icon" />
+            {availableModels.length > 0 ? (
+              <select 
+                value={activeModelValue} 
+                onChange={handleModelChange}
+                className="header-model-select"
+              >
+                {availableModels.map((m) => (
+                  <option key={`${m.provider}:${m.id}`} value={`${m.provider}:${m.id}`}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <select disabled className="header-model-select" style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+                <option value="">No Active Keys (Open Settings)</option>
+              </select>
+            )}
+          </div>
+
           {/* Token count indicator */}
           <div className="token-counter" title="Estimated tokens loaded in memory">
             <Layers size={12} className="token-icon" />
@@ -400,6 +441,42 @@ export const MainChat: React.FC = () => {
         .btn-clear-chat:disabled {
           opacity: 0.4;
           cursor: not-allowed;
+        }
+        
+        .model-selector-container {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          background: rgba(15, 23, 42, 0.4);
+          border: 1px solid var(--border-color);
+          padding: 4px 8px;
+          border-radius: var(--radius-sm);
+          font-size: 11px;
+          color: var(--text-secondary);
+          transition: all var(--transition-fast);
+        }
+        .model-selector-container:hover {
+          border-color: var(--color-brand);
+          background: rgba(var(--color-brand-rgb), 0.05);
+        }
+        .model-icon {
+          color: var(--color-brand);
+          flex-shrink: 0;
+        }
+        .header-model-select {
+          background: transparent;
+          border: none;
+          color: var(--text-primary);
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          outline: none;
+          padding: 2px 14px 2px 2px;
+          margin-right: -10px;
+        }
+        .header-model-select option {
+          background: #0f172a;
+          color: var(--text-primary);
         }
         
         .messages-area {
