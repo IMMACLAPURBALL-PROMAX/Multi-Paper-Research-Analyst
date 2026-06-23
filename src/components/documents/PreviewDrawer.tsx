@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { Flame, Calendar, BookCheck, Send, Trash2, Globe, FileText, X } from 'lucide-react';
+import { renderMarkdown } from '@/lib/markdown';
 
 export const PreviewDrawer: React.FC = () => {
   const {
@@ -126,7 +127,7 @@ export const PreviewDrawer: React.FC = () => {
                     <div className="msg-header">
                       {m.sender === 'user' ? 'You' : `${modelConfig.provider.toUpperCase()}`}
                     </div>
-                    <p>{m.content}</p>
+                    <div className="staged-msg-content">{renderMarkdown(m.content)}</div>
                   </div>
                 ))}
                 {isChatting && (

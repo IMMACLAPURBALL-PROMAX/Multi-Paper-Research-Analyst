@@ -369,20 +369,49 @@ CRITICAL INSTRUCTIONS:
       let groundedSources: Array<{ id: string; title: string }> = [];
 
       if (trustedSources.length > 0) {
-        // Run client-side TF-IDF RAG
-        const searchEngine = new TFIDFSearchEngine(trustedSources);
-        const searchResults = searchEngine.search(text, 6);
+        // 1. Inject a global catalog of active notebook documents with their abstracts
+        systemInstruction += `\n\nActive Notebook Documents (Total: ${trustedSources.length}):\n`;
+        trustedSources.forEach((doc, idx) => {
+          const docNum = idx + 1;
+          systemInstruction += `\n[Document ${docNum}] Title: "${doc.title}" (ID: ${doc.id})\n`;
+          systemInstruction += `Authors: ${doc.authors.join(', ')}\n`;
+          systemInstruction += `Abstract: ${doc.abstract || 'No abstract available.'}\n`;
+        });
 
-        systemInstruction += `\n\nTrusted Sources Context:\n`;
-        searchResults.forEach((res, i) => {
-          const citationIdx = i + 1;
-          systemInstruction += `\n[${citationIdx}] Document: "${res.chunk.documentTitle}" (ID: ${res.chunk.documentId})\n`;
-          systemInstruction += `Excerpt: ${res.chunk.text}\n`;
+        // 2. Perform document-by-document TF-IDF search to guarantee multi-document context retrieval
+        const mergedResults: Array<{ chunk: any; score: number }> = [];
+        
+        // Retrieve 3 to 6 segments per document depending on the total count of documents
+        const segmentsPerDoc = Math.max(3, Math.min(6, Math.floor(12 / trustedSources.length)));
+        
+        for (const doc of trustedSources) {
+          const searchEngine = new TFIDFSearchEngine([doc]);
+          const docResults = searchEngine.search(text, segmentsPerDoc);
+          mergedResults.push(...docResults);
+        }
+
+        // Sort the combined results by their scores so the most relevant overall are ordered first
+        mergedResults.sort((a, b) => b.score - a.score);
+
+        // Append segments as context
+        systemInstruction += `\n\nTrusted Sources Context Excerpts (Use these excerpts to answer specific queries and reference them using Document citation numbers from the active catalog above, e.g. Document [1]):\n`;
+        
+        mergedResults.forEach((res, i) => {
+          const globalDocIdx = trustedSources.findIndex(d => d.id === res.chunk.documentId);
+          const citationIdx = globalDocIdx !== -1 ? globalDocIdx + 1 : 1;
           
+          systemInstruction += `\nExcerpt [${i + 1}] (From Document [${citationIdx}]: "${res.chunk.documentTitle}" - ID: ${res.chunk.documentId}):\n`;
+          systemInstruction += `${res.chunk.text}\n`;
+
+          // Track which sources are actually present in the prompt context to display in the UI Grounding badges
           if (!groundedSources.some(s => s.id === res.chunk.documentId)) {
             groundedSources.push({ id: res.chunk.documentId, title: res.chunk.documentTitle });
           }
         });
+        
+        // 3. Add strict grounding constraints in system instructions to block parametric memory recall
+        systemInstruction += `\n\nCRITICAL GROUNDING CONSTRAINT: 
+Do NOT rely on your pre-training knowledge or parametric memory to answer questions about these documents, authors, or DOIs. You must only answer using the information explicitly provided in the active notebook list and excerpts above. If the context does not contain the answer, state "I cannot find the answer in the uploaded documents."`;
       } else {
         systemInstruction += `\nNo documents have been promoted to the trusted notebook yet.`;
       }

@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { Send, Sparkles, Trash2, ShieldAlert, Cpu, Layers, Paperclip, X, Image as ImageIcon, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { renderMarkdown } from '@/lib/markdown';
 
 export const MainChat: React.FC = () => {
   const { 
@@ -169,7 +170,7 @@ export const MainChat: React.FC = () => {
                       />
                     </div>
                   )}
-                  <p className="message-content">{msg.content}</p>
+                  <div className="message-content">{renderMarkdown(msg.content)}</div>
                   
                   {/* Grounded references list */}
                   {msg.sender === 'assistant' && msg.sources && msg.sources.length > 0 && (
