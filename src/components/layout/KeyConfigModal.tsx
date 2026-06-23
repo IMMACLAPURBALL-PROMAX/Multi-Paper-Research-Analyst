@@ -12,6 +12,7 @@ interface KeyConfigModalProps {
 const MODELS_BY_PROVIDER = {
   gemini: [
     { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash (Fast, balanced, multimodal)' },
+    { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite (Fastest, cost-efficient, stable)' },
     { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview (Complex reasoning, coding)' },
   ],
   claude: [
