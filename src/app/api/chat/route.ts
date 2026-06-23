@@ -91,8 +91,8 @@ async function handleGemini(
     };
   });
 
-  // Switch to the stable v1 endpoint for stable models like gemini-1.5-flash
-  const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`;
+  // Switch to the v1beta endpoint which supports systemInstruction for models like gemini-3.5-flash
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const payload: any = {
     contents,
