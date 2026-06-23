@@ -9,10 +9,17 @@ import mermaid from 'mermaid';
 let renderIdCounter = 0;
 
 export const MindMapCanvas: React.FC = () => {
-  const { trustedSources, apiKeys, modelConfig } = useWorkspace();
+  const { 
+    trustedSources, 
+    apiKeys, 
+    modelConfig,
+    activeCenterTab,
+    setActiveCenterTab
+  } = useWorkspace();
   const [mermaidCode, setMermaidCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
   
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -171,9 +178,26 @@ mindmap
     <div className="mindmap-container glass-panel">
       {/* 1. Header Row */}
       <div className="canvas-header border-bottom">
-        <div className="title-area">
-          <GitFork className="fork-icon" size={16} />
-          <h2>Concept Canvas</h2>
+        <div className="header-tabs-container">
+          <div className="header-tabs">
+            <button 
+              className={`header-tab-btn ${activeCenterTab === 'chat' ? 'active' : ''}`}
+              onClick={() => setActiveCenterTab('chat')}
+            >
+              Analyst Chat
+            </button>
+            <button 
+              className={`header-tab-btn ${activeCenterTab === 'canvas' ? 'active' : ''}`}
+              onClick={() => setActiveCenterTab('canvas')}
+            >
+              Concept Canvas
+            </button>
+          </div>
+          {activeCenterTab === 'chat' ? (
+            <span className="header-tab-desc">Grounded in notebook</span>
+          ) : (
+            <span className="header-tab-desc">Visual concept map</span>
+          )}
         </div>
         
         {trustedSources.length > 0 && hasKeys && (
@@ -231,10 +255,29 @@ mindmap
         {!isLoading && !error && mermaidCode && (
           <div className="canvas-viewport">
             {/* The Render Target */}
-            <div ref={canvasRef} className="mermaid-render-target" />
+            <div 
+              ref={canvasRef} 
+              className="mermaid-render-target" 
+              style={{
+                transform: `scale(${zoomLevel})`,
+                transformOrigin: 'center center',
+                transition: 'transform 0.15s ease-out',
+                display: 'inline-block',
+                margin: 'auto'
+              }}
+            />
             
             {/* Floating controls */}
             <div className="floating-canvas-controls">
+              <button onClick={() => setZoomLevel(z => Math.min(z + 0.15, 2.5))} title="Zoom In">
+                <ZoomIn size={14} />
+              </button>
+              <button onClick={() => setZoomLevel(z => Math.max(z - 0.15, 0.4))} title="Zoom Out">
+                <ZoomOut size={14} />
+              </button>
+              <button onClick={() => setZoomLevel(1)} title="Reset Zoom">
+                <Maximize2 size={14} />
+              </button>
               <button onClick={() => window.print()} title="Print / Export PDF">
                 <Download size={14} />
               </button>
@@ -278,15 +321,15 @@ mindmap
           align-items: center;
           gap: 6px;
           color: var(--text-primary);
-          background: rgba(99, 102, 241, 0.12);
-          border: 1px solid rgba(99, 102, 241, 0.25);
+          background: var(--color-brand-glow);
+          border: 1px solid var(--border-color-glow);
           font-size: 11px;
           font-weight: 600;
           padding: 4px 10px;
           border-radius: var(--radius-sm);
         }
         .btn-sync:hover:not(:disabled) {
-          background: rgba(99, 102, 241, 0.2);
+          background: rgba(var(--color-brand-rgb), 0.2);
           border-color: var(--color-brand);
         }
         
@@ -386,7 +429,7 @@ mindmap
           display: flex;
           align-items: center;
           justify-content: center;
-          overflow-y: auto;
+          overflow: auto;
           position: relative;
         }
         .mermaid-render-target {
@@ -394,6 +437,45 @@ mindmap
           display: flex;
           justify-content: center;
           align-items: center;
+        }
+
+        /* Tabs styling */
+        .header-tabs-container {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .header-tabs {
+          display: flex;
+          background: rgba(15, 23, 42, 0.4);
+          border: 1px solid var(--border-color);
+          padding: 2px;
+          border-radius: var(--radius-md);
+        }
+        .header-tab-btn {
+          background: transparent;
+          border: none;
+          color: var(--text-secondary);
+          padding: 6px 14px;
+          border-radius: calc(var(--radius-md) - 2px);
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all var(--transition-fast);
+        }
+        .header-tab-btn:hover {
+          color: var(--text-primary);
+        }
+        .header-tab-btn.active {
+          background: var(--color-brand-glow);
+          border: 1px solid var(--border-color-glow);
+          color: #fff;
+          font-weight: 600;
+        }
+        .header-tab-desc {
+          font-size: 11px;
+          color: var(--text-muted);
+          font-weight: 500;
         }
 
         .floating-canvas-controls {

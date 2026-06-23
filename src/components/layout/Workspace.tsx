@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { WorkspaceProvider } from '@/context/WorkspaceContext';
+import { WorkspaceProvider, useWorkspace } from '@/context/WorkspaceContext';
 import { TrustedPanel } from '@/components/documents/TrustedPanel';
 import { ResearchPanel } from '@/components/documents/ResearchPanel';
 import { PreviewDrawer } from '@/components/documents/PreviewDrawer';
@@ -10,67 +10,80 @@ import { MindMapCanvas } from '@/components/visualization/MindMapCanvas';
 import { KeyConfigModal } from '@/components/layout/KeyConfigModal';
 import { BookOpen, Sparkles } from 'lucide-react';
 
+const InnerWorkspace: React.FC<{
+  activeLeftTab: 'notebook' | 'research';
+  setActiveLeftTab: (tab: 'notebook' | 'research') => void;
+  isSettingsOpen: boolean;
+  setIsSettingsOpen: (open: boolean) => void;
+}> = ({ activeLeftTab, setActiveLeftTab, isSettingsOpen, setIsSettingsOpen }) => {
+  const { activeCenterTab } = useWorkspace();
+
+  return (
+    <div className="workspace-container">
+      {/* Left Column - Navigation and Sources */}
+      <div className="workspace-column left-col">
+        {/* Tab Switcher Header */}
+        <div className="column-tabs border-bottom">
+          <button
+            className={`tab-btn ${activeLeftTab === 'notebook' ? 'active' : ''}`}
+            onClick={() => setActiveLeftTab('notebook')}
+          >
+            <BookOpen size={14} />
+            <span>Notebook</span>
+          </button>
+          
+          <button
+            className={`tab-btn tab-btn-research ${activeLeftTab === 'research' ? 'active' : ''}`}
+            onClick={() => setActiveLeftTab('research')}
+          >
+            <Sparkles size={14} />
+            <span>Research Mode</span>
+          </button>
+        </div>
+
+        {/* Active Panel Display */}
+        <div className="active-panel-container">
+          {activeLeftTab === 'notebook' ? (
+            <TrustedPanel onOpenSettings={() => setIsSettingsOpen(true)} />
+          ) : (
+            <ResearchPanel />
+          )}
+        </div>
+
+        <PreviewDrawer />
+      </div>
+
+      {/* Center Column - Grounded Chat or Concept Canvas */}
+      <div className="workspace-column center-col">
+        {activeCenterTab === 'chat' ? <MainChat /> : <MindMapCanvas />}
+      </div>
+
+      {/* Settings Modal */}
+      <KeyConfigModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
+    </div>
+  );
+};
+
 export const Workspace: React.FC = () => {
   const [activeLeftTab, setActiveLeftTab] = useState<'notebook' | 'research'>('notebook');
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
   return (
     <WorkspaceProvider>
-      <div className="workspace-container">
-        {/* Left Column - Navigation and Sources */}
-        <div className="workspace-column left-col">
-          {/* Tab Switcher Header */}
-          <div className="column-tabs border-bottom">
-            <button
-              className={`tab-btn ${activeLeftTab === 'notebook' ? 'active' : ''}`}
-              onClick={() => setActiveLeftTab('notebook')}
-            >
-              <BookOpen size={14} />
-              <span>Notebook</span>
-            </button>
-            
-            <button
-              className={`tab-btn tab-btn-research ${activeLeftTab === 'research' ? 'active' : ''}`}
-              onClick={() => setActiveLeftTab('research')}
-            >
-              <Sparkles size={14} />
-              <span>Research Mode</span>
-            </button>
-          </div>
+      <InnerWorkspace 
+        activeLeftTab={activeLeftTab}
+        setActiveLeftTab={setActiveLeftTab}
+        isSettingsOpen={isSettingsOpen}
+        setIsSettingsOpen={setIsSettingsOpen}
+      />
 
-          {/* Active Panel Display */}
-          <div className="active-panel-container">
-            {activeLeftTab === 'notebook' ? (
-              <TrustedPanel onOpenSettings={() => setIsSettingsOpen(true)} />
-            ) : (
-              <ResearchPanel />
-            )}
-          </div>
-
-          <PreviewDrawer />
-        </div>
-
-        {/* Center Column - Grounded Chat */}
-        <div className="workspace-column center-col">
-          <MainChat />
-        </div>
-
-        {/* Right Column - Concept Canvas */}
-        <div className="workspace-column right-col">
-          <MindMapCanvas />
-        </div>
-
-        {/* Settings Modal */}
-        <KeyConfigModal
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-        />
-      </div>
-
-      <style jsx>{`
+      <style jsx global>{`
         .workspace-container {
           display: grid;
-          grid-template-columns: 310px 1fr 340px;
+          grid-template-columns: 310px 1fr;
           height: 100vh;
           width: 100vw;
           background-color: var(--bg-primary);
@@ -92,10 +105,6 @@ export const Workspace: React.FC = () => {
         
         .center-col {
           background: var(--bg-secondary);
-        }
-        
-        .right-col {
-          border-left: 1px solid var(--border-color);
         }
         
         .border-bottom {
@@ -132,8 +141,8 @@ export const Workspace: React.FC = () => {
         
         .tab-btn.active {
           color: #fff;
-          background: rgba(99, 102, 241, 0.15);
-          border: 1px solid rgba(99, 102, 241, 0.25);
+          background: var(--color-brand-glow);
+          border: 1px solid var(--border-color-glow);
         }
         
         .tab-btn-research.active {
@@ -151,9 +160,6 @@ export const Workspace: React.FC = () => {
         @media (max-width: 1024px) {
           .workspace-container {
             grid-template-columns: 260px 1fr;
-          }
-          .right-col {
-            display: none; /* Hide mind map on tablet/mobile size */
           }
         }
       `}</style>

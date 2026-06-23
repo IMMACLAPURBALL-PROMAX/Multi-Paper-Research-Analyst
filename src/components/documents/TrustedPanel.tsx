@@ -190,9 +190,9 @@ export const TrustedPanel: React.FC<TrustedPanelProps> = ({ onOpenSettings }) =>
           transition: all var(--transition-fast);
         }
         .key-status-bar:hover {
-          background: rgba(99, 102, 241, 0.06);
+          background: rgba(var(--color-brand-rgb), 0.06);
           border-color: var(--color-brand-glow);
-          box-shadow: 0 0 10px 0 rgba(99, 102, 241, 0.05);
+          box-shadow: 0 0 10px 0 rgba(var(--color-brand-rgb), 0.05);
         }
         .status-label-row {
           display: flex;
@@ -270,7 +270,7 @@ export const TrustedPanel: React.FC<TrustedPanelProps> = ({ onOpenSettings }) =>
         }
         .upload-button:hover {
           background: var(--color-brand-hover);
-          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+          box-shadow: 0 4px 12px rgba(var(--color-brand-rgb), 0.25);
         }
         .uploading-state {
           width: 100%;
@@ -377,13 +377,13 @@ export const TrustedPanel: React.FC<TrustedPanelProps> = ({ onOpenSettings }) =>
           transition: all var(--transition-fast);
         }
         .source-item:hover {
-          border-color: rgba(99, 102, 241, 0.2);
-          background: rgba(99, 102, 241, 0.02);
+          border-color: rgba(var(--color-brand-rgb), 0.2);
+          background: rgba(var(--color-brand-rgb), 0.02);
         }
         .source-item.active {
           border-color: var(--color-brand);
-          background: rgba(99, 102, 241, 0.08);
-          box-shadow: 0 0 10px rgba(99, 102, 241, 0.05);
+          background: rgba(var(--color-brand-rgb), 0.08);
+          box-shadow: 0 0 10px rgba(var(--color-brand-rgb), 0.05);
         }
         .source-info {
           flex-grow: 1;

@@ -16,11 +16,12 @@ export const ResearchPanel: React.FC = () => {
   } = useWorkspace();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchEngine, setSearchEngine] = useState<'all' | 'arxiv' | 'semanticscholar'>('all');
 
   const handleSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim() || isSearching) return;
-    await searchPapers(searchQuery);
+    await searchPapers(searchQuery, searchEngine);
   };
 
   return (
@@ -46,6 +47,33 @@ export const ResearchPanel: React.FC = () => {
               <Search size={16} />
             </button>
           </div>
+
+          <div className="search-engine-selector">
+            <button
+              type="button"
+              className={`engine-btn ${searchEngine === 'all' ? 'active' : ''}`}
+              onClick={() => setSearchEngine('all')}
+              disabled={isSearching}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              className={`engine-btn ${searchEngine === 'arxiv' ? 'active' : ''}`}
+              onClick={() => setSearchEngine('arxiv')}
+              disabled={isSearching}
+            >
+              arXiv
+            </button>
+            <button
+              type="button"
+              className={`engine-btn ${searchEngine === 'semanticscholar' ? 'active' : ''}`}
+              onClick={() => setSearchEngine('semanticscholar')}
+              disabled={isSearching}
+            >
+              S. Scholar
+            </button>
+          </div>
         </form>
         {searchError && <p className="error-text">{searchError}</p>}
       </div>
@@ -60,7 +88,13 @@ export const ResearchPanel: React.FC = () => {
         {isSearching && (
           <div className="search-loading-state">
             <div className="spinner"></div>
-            <span>Querying arXiv & Semantic Scholar...</span>
+            <span>
+              {searchEngine === 'all'
+                ? 'Querying arXiv & Semantic Scholar...'
+                : searchEngine === 'arxiv'
+                ? 'Querying arXiv...'
+                : 'Querying Semantic Scholar...'}
+            </span>
           </div>
         )}
 
@@ -167,6 +201,41 @@ export const ResearchPanel: React.FC = () => {
         .btn-search-icon:hover:not(:disabled) {
           background: rgba(148, 163, 184, 0.08);
           color: var(--text-primary);
+        }
+        
+        .search-engine-selector {
+          display: flex;
+          background: rgba(15, 23, 42, 0.4);
+          border: 1px solid var(--border-color);
+          padding: 2px;
+          border-radius: var(--radius-sm);
+          margin-top: 8px;
+        }
+        .engine-btn {
+          flex: 1;
+          background: transparent;
+          border: none;
+          color: var(--text-secondary);
+          padding: 4px 8px;
+          border-radius: calc(var(--radius-sm) - 2px);
+          font-size: 10px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all var(--transition-fast);
+          text-align: center;
+        }
+        .engine-btn:hover:not(:disabled) {
+          color: var(--text-primary);
+        }
+        .engine-btn.active {
+          background: var(--color-brand-glow);
+          border: 1px solid var(--border-color-glow);
+          color: #fff;
+          font-weight: 600;
+        }
+        .engine-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
         .error-text {
           font-size: 11px;

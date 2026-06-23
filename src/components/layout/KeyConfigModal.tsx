@@ -25,18 +25,31 @@ const MODELS_BY_PROVIDER = {
   ]
 };
 
+const THEMES = {
+  purple: { label: 'Indigo', brand: '#6366f1' },
+  coral: { label: 'Coral', brand: '#FF6B6B' },
+  amber: { label: 'Amber', brand: '#FFC300' },
+  teal: { label: 'Teal', brand: '#2EC4B6' },
+  plains: { label: 'Plains', brand: '#A9DFBF' }
+};
+
 export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose }) => {
-  const { apiKeys, modelConfig, updateApiKeys, updateModelConfig } = useWorkspace();
+  const { 
+    apiKeys, 
+    modelConfig, 
+    updateApiKeys, 
+    updateModelConfig,
+    activeTheme,
+    updateTheme
+  } = useWorkspace();
   
   const [geminiKey, setGeminiKey] = useState(apiKeys.gemini || '');
   const [claudeKey, setClaudeKey] = useState(apiKeys.claude || '');
   const [openaiKey, setOpenaiKey] = useState(apiKeys.openai || '');
-  const [semanticScholarKey, setSemanticScholarKey] = useState(apiKeys.semanticScholar || '');
   
   const [showGemini, setShowGemini] = useState(false);
   const [showClaude, setShowClaude] = useState(false);
   const [showOpenai, setShowOpenai] = useState(false);
-  const [showSemanticScholar, setShowSemanticScholar] = useState(false);
   
   const [provider, setProvider] = useState(modelConfig.provider);
   const [model, setModel] = useState(modelConfig.model);
@@ -49,7 +62,6 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
       setGeminiKey(apiKeys.gemini || '');
       setClaudeKey(apiKeys.claude || '');
       setOpenaiKey(apiKeys.openai || '');
-      setSemanticScholarKey(apiKeys.semanticScholar || '');
       setProvider(modelConfig.provider);
       setModel(modelConfig.model);
       setTemperature(modelConfig.temperature ?? 0.2);
@@ -69,7 +81,7 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
       gemini: geminiKey.trim() || undefined,
       claude: claudeKey.trim() || undefined,
       openai: openaiKey.trim() || undefined,
-      semanticScholar: semanticScholarKey.trim() || undefined
+      semanticScholar: apiKeys.semanticScholar
     });
     
     updateModelConfig({
@@ -235,30 +247,44 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
               </div>
             </div>
 
-            {/* Semantic Scholar key */}
-            <div className="input-key-wrapper">
-              <div className="key-header">
-                <label>Semantic Scholar API Key (Optional)</label>
-                {semanticScholarKey && <span className="key-indicator active">Configured</span>}
-              </div>
-              <div className="input-action-row">
-                <input
-                  type={showSemanticScholar ? 'text' : 'password'}
-                  placeholder="Enter Semantic Scholar Key..."
-                  value={semanticScholarKey}
-                  onChange={(e) => setSemanticScholarKey(e.target.value)}
-                />
-                <button 
-                  className="btn-eye" 
-                  onClick={() => setShowSemanticScholar(!showSemanticScholar)}
-                  title={showSemanticScholar ? "Hide Key" : "Show Key"}
+          </div> {/* Closes Configure API Keys form-group */}
+
+          <div className="form-group">
+            <h3>3. Accent Theme</h3>
+            <p className="subtitle">Select your preferred accent color for the workspace.</p>
+            <div className="theme-selectors-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '6px' }}>
+              {Object.entries(THEMES).map(([name, themeInfo]) => (
+                <button
+                  key={name}
+                  type="button"
+                  className={`theme-dot-btn ${activeTheme === name ? 'active' : ''}`}
+                  onClick={() => updateTheme(name as any)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    border: activeTheme === name ? '1px solid var(--color-brand)' : '1px solid var(--border-color)',
+                    background: activeTheme === name ? 'var(--color-brand-glow)' : 'rgba(15, 23, 42, 0.4)',
+                    color: activeTheme === name ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all var(--transition-fast)'
+                  }}
                 >
-                  {showSemanticScholar ? <EyeOff size={16} /> : <Eye size={16} />}
+                  <span style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    backgroundColor: themeInfo.brand,
+                    display: 'inline-block',
+                    boxShadow: activeTheme === name ? `0 0 8px ${themeInfo.brand}` : 'none'
+                  }} />
+                  {themeInfo.label}
                 </button>
-              </div>
-              <p style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Used to bypass global rate-limiting when searching non-physics business papers.
-              </p>
+              ))}
             </div>
           </div>
         </div>

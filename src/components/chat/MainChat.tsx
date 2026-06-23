@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspace } from '@/context/WorkspaceContext';
-import { Send, Sparkles, Trash2, ShieldAlert, Cpu, Layers, Paperclip, X, Image as ImageIcon } from 'lucide-react';
+import { Send, Sparkles, Trash2, ShieldAlert, Cpu, Layers, Paperclip, X, Image as ImageIcon, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 
 export const MainChat: React.FC = () => {
   const { 
@@ -13,11 +13,16 @@ export const MainChat: React.FC = () => {
     clearWorkspaceChat,
     trustedSources,
     apiKeys,
-    modelConfig
+    modelConfig,
+    activeCenterTab,
+    setActiveCenterTab
   } = useWorkspace();
 
   const [input, setInput] = useState('');
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [activeLightboxImage, setActiveLightboxImage] = useState<string | null>(null);
+  const [lightboxScale, setLightboxScale] = useState<number>(1);
+  
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -80,9 +85,26 @@ export const MainChat: React.FC = () => {
     <div className="main-chat-container">
       {/* 1. Header Row */}
       <div className="chat-header border-bottom">
-        <div className="header-info">
-          <h2>Workspace Analyst Chat</h2>
-          <p className="subtitle">Answers are strictly grounded in your promoted papers</p>
+        <div className="header-tabs-container">
+          <div className="header-tabs">
+            <button 
+              className={`header-tab-btn ${activeCenterTab === 'chat' ? 'active' : ''}`}
+              onClick={() => setActiveCenterTab('chat')}
+            >
+              Analyst Chat
+            </button>
+            <button 
+              className={`header-tab-btn ${activeCenterTab === 'canvas' ? 'active' : ''}`}
+              onClick={() => setActiveCenterTab('canvas')}
+            >
+              Concept Canvas
+            </button>
+          </div>
+          {activeCenterTab === 'chat' ? (
+            <span className="header-tab-desc">Grounded in notebook</span>
+          ) : (
+            <span className="header-tab-desc">Visual concept map</span>
+          )}
         </div>
         
         <div className="header-actions">
@@ -135,7 +157,16 @@ export const MainChat: React.FC = () => {
                 <div className="message-bubble">
                   {msg.image && (
                     <div className="message-image-wrapper">
-                      <img src={msg.image} className="message-image" alt="Attached diagram" />
+                      <img 
+                        src={msg.image} 
+                        className="message-image" 
+                        alt="Attached diagram" 
+                        onClick={() => {
+                          setActiveLightboxImage(msg.image || null);
+                          setLightboxScale(1);
+                        }}
+                        style={{ cursor: 'zoom-in' }}
+                      />
                     </div>
                   )}
                   <p className="message-content">{msg.content}</p>
@@ -256,6 +287,57 @@ export const MainChat: React.FC = () => {
         </div>
       </div>
 
+      {/* Lightbox Overlay */}
+      {activeLightboxImage && (
+        <div 
+          className="lightbox-overlay"
+          onClick={() => setActiveLightboxImage(null)}
+        >
+          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <button 
+              className="lightbox-close-btn"
+              onClick={() => setActiveLightboxImage(null)}
+              title="Close image"
+            >
+              <X size={20} />
+            </button>
+
+            <div className="lightbox-viewport">
+              <img 
+                src={activeLightboxImage} 
+                className="lightbox-image" 
+                alt="Enlarged visualization"
+                style={{ 
+                  transform: `scale(${lightboxScale})`,
+                  transition: 'transform 0.15s ease-out'
+                }}
+              />
+            </div>
+
+            <div className="lightbox-controls">
+              <button 
+                onClick={() => setLightboxScale(s => Math.min(s + 0.25, 4))}
+                title="Zoom In"
+              >
+                <ZoomIn size={16} />
+              </button>
+              <button 
+                onClick={() => setLightboxScale(s => Math.max(s - 0.25, 0.5))}
+                title="Zoom Out"
+              >
+                <ZoomOut size={16} />
+              </button>
+              <button 
+                onClick={() => setLightboxScale(1)}
+                title="Reset Zoom"
+              >
+                <Maximize2 size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
         .main-chat-container {
           height: 100%;
@@ -337,8 +419,8 @@ export const MainChat: React.FC = () => {
         .glow-brand-icon {
           width: 56px;
           height: 56px;
-          background: rgba(99, 102, 241, 0.08);
-          border: 1px solid rgba(99, 102, 241, 0.2);
+          background: rgba(var(--color-brand-rgb), 0.08);
+          border: 1px solid rgba(var(--color-brand-rgb), 0.2);
           border-radius: var(--radius-lg);
           display: flex;
           align-items: center;
@@ -419,7 +501,7 @@ export const MainChat: React.FC = () => {
           background: var(--color-brand);
           color: #fff;
           border-bottom-right-radius: 4px;
-          box-shadow: 0 4px 10px rgba(99, 102, 241, 0.2);
+          box-shadow: 0 4px 10px rgba(var(--color-brand-rgb), 0.2);
         }
         .assistant-wrapper .message-bubble {
           background: var(--bg-surface);
@@ -449,9 +531,9 @@ export const MainChat: React.FC = () => {
         .grounding-chip {
           font-size: 10px;
           font-weight: 500;
-          color: #a5b4fc;
-          background: rgba(99, 102, 241, 0.1);
-          border: 1px solid rgba(99, 102, 241, 0.15);
+          color: var(--color-brand);
+          background: var(--color-brand-glow);
+          border: 1px solid var(--border-color-glow);
           padding: 2px 6px;
           border-radius: var(--radius-sm);
           white-space: nowrap;
@@ -629,6 +711,137 @@ export const MainChat: React.FC = () => {
           max-height: 200px;
           object-fit: contain;
           background: #000;
+        }
+
+        /* Tabs styling */
+        .header-tabs-container {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .header-tabs {
+          display: flex;
+          background: rgba(15, 23, 42, 0.4);
+          border: 1px solid var(--border-color);
+          padding: 2px;
+          border-radius: var(--radius-md);
+        }
+        .header-tab-btn {
+          background: transparent;
+          border: none;
+          color: var(--text-secondary);
+          padding: 6px 14px;
+          border-radius: calc(var(--radius-md) - 2px);
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all var(--transition-fast);
+        }
+        .header-tab-btn:hover {
+          color: var(--text-primary);
+        }
+        .header-tab-btn.active {
+          background: var(--color-brand-glow);
+          border: 1px solid var(--border-color-glow);
+          color: #fff;
+          font-weight: 600;
+        }
+        .header-tab-desc {
+          font-size: 11px;
+          color: var(--text-muted);
+          font-weight: 500;
+        }
+
+        /* Lightbox styling */
+        .lightbox-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(8, 12, 22, 0.9);
+          backdrop-filter: blur(12px);
+          z-index: 9999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          animation: fadeIn var(--transition-fast) forwards;
+        }
+        .lightbox-content {
+          position: relative;
+          width: 90vw;
+          height: 90vh;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+        }
+        .lightbox-close-btn {
+          position: absolute;
+          top: 0;
+          right: 0;
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: #fff;
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all var(--transition-fast);
+          z-index: 10001;
+        }
+        .lightbox-close-btn:hover {
+          background: rgba(239, 68, 68, 0.2);
+          border-color: rgba(239, 68, 68, 0.4);
+          color: #fca5a5;
+        }
+        .lightbox-viewport {
+          flex-grow: 1;
+          width: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          overflow: auto;
+          padding: 20px;
+        }
+        .lightbox-image {
+          max-width: 95%;
+          max-height: 85vh;
+          object-fit: contain;
+          border-radius: var(--radius-sm);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+          user-select: none;
+        }
+        .lightbox-controls {
+          margin-top: 16px;
+          display: flex;
+          gap: 8px;
+          background: rgba(15, 23, 42, 0.85);
+          backdrop-filter: blur(8px);
+          border: 1px solid var(--border-color);
+          padding: 6px;
+          border-radius: var(--radius-md);
+          z-index: 10001;
+        }
+        .lightbox-controls button {
+          color: var(--text-secondary);
+          width: 30px;
+          height: 30px;
+          border-radius: var(--radius-sm);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all var(--transition-fast);
+          background: transparent;
+          border: none;
+          cursor: pointer;
+        }
+        .lightbox-controls button:hover {
+          background: rgba(148, 163, 184, 0.1);
+          color: var(--text-primary);
         }
       `}</style>
     </div>

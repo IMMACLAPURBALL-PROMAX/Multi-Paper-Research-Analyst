@@ -34,12 +34,16 @@ interface WorkspaceContextProps {
   updateApiKeys: (keys: APIKeys) => void;
   updateModelConfig: (config: ModelConfig) => void;
   uploadPDF: (file: File) => Promise<void>;
-  searchPapers: (query: string) => Promise<DocumentSource[]>;
+  searchPapers: (query: string, engine?: 'all' | 'arxiv' | 'semanticscholar') => Promise<DocumentSource[]>;
   promotePaperToTrusted: (id: string) => Promise<void>;
   discardStagedPaper: (id: string) => Promise<void>;
   sendWorkspaceMessage: (text: string, image?: string) => Promise<void>;
   sendStagedPaperMessage: (paperId: string, text: string) => Promise<void>;
   clearWorkspaceChat: () => Promise<void>;
+  activeCenterTab: 'chat' | 'canvas';
+  setActiveCenterTab: (tab: 'chat' | 'canvas') => void;
+  activeTheme: 'purple' | 'coral' | 'amber' | 'teal' | 'plains';
+  updateTheme: (theme: 'purple' | 'coral' | 'amber' | 'teal' | 'plains') => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextProps | undefined>(undefined);
@@ -71,6 +75,42 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   
   const [searchError, setSearchError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [activeCenterTab, setActiveCenterTab] = useState<'chat' | 'canvas'>('chat');
+  const [activeTheme, setActiveTheme] = useState<'purple' | 'coral' | 'amber' | 'teal' | 'plains'>('purple');
+
+  // Load cached theme from localStorage on mount
+  useEffect(() => {
+    const cachedTheme = localStorage.getItem('workspace_theme');
+    if (cachedTheme) {
+      setActiveTheme(cachedTheme as any);
+    }
+  }, []);
+
+  // Sync theme css variables to document root
+  useEffect(() => {
+    const root = document.documentElement;
+    const colors = {
+      purple: { brand: '#6366f1', hover: '#4f46e5', rgb: '99, 102, 241', glow: 'rgba(99, 102, 241, 0.15)', borderGlow: 'rgba(99, 102, 241, 0.25)' },
+      coral: { brand: '#FF6B6B', hover: '#FF5252', rgb: '255, 107, 107', glow: 'rgba(255, 107, 107, 0.15)', borderGlow: 'rgba(255, 107, 107, 0.25)' },
+      amber: { brand: '#FFC300', hover: '#E6B000', rgb: '255, 195, 0', glow: 'rgba(255, 195, 0, 0.15)', borderGlow: 'rgba(255, 195, 0, 0.25)' },
+      teal: { brand: '#2EC4B6', hover: '#259E92', rgb: '46, 196, 182', glow: 'rgba(46, 196, 182, 0.15)', borderGlow: 'rgba(46, 196, 182, 0.25)' },
+      plains: { brand: '#A9DFBF', hover: '#8FD4A8', rgb: '169, 223, 191', glow: 'rgba(169, 223, 191, 0.15)', borderGlow: 'rgba(169, 223, 191, 0.25)' }
+    }[activeTheme];
+
+    if (colors) {
+      root.style.setProperty('--color-brand', colors.brand);
+      root.style.setProperty('--color-brand-hover', colors.hover);
+      root.style.setProperty('--color-brand-rgb', colors.rgb);
+      root.style.setProperty('--color-brand-glow', colors.glow);
+      root.style.setProperty('--border-color-glow', colors.borderGlow);
+      root.style.setProperty('--shadow-glow', `0 0 20px 0 ${colors.glow}`);
+    }
+  }, [activeTheme]);
+
+  const updateTheme = (theme: 'purple' | 'coral' | 'amber' | 'teal' | 'plains') => {
+    setActiveTheme(theme);
+    localStorage.setItem('workspace_theme', theme);
+  };
 
   // 1. Initial Load: Load sources, main chat and keys from sessionStorage/IndexedDB
   useEffect(() => {
@@ -185,7 +225,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   // 4. Academic Search
-  const searchPapers = async (query: string): Promise<DocumentSource[]> => {
+  const searchPapers = async (query: string, engine: 'all' | 'arxiv' | 'semanticscholar' = 'all'): Promise<DocumentSource[]> => {
     setIsSearching(true);
     setSearchError(null);
     try {
@@ -194,7 +234,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         headers['x-semanticscholar-key'] = apiKeys.semanticScholar;
       }
       
-      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=12`, {
+      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=12&engine=${engine}`, {
         headers
       });
       
@@ -512,7 +552,11 @@ ${docContext}
       discardStagedPaper,
       sendWorkspaceMessage,
       sendStagedPaperMessage,
-      clearWorkspaceChat
+      clearWorkspaceChat,
+      activeCenterTab,
+      setActiveCenterTab,
+      activeTheme,
+      updateTheme
     }}>
       {children}
     </WorkspaceContext.Provider>

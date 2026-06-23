@@ -104,24 +104,34 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Search query parameter "q" is required.' }, { status: 400 });
   }
 
+  const engine = searchParams.get('engine') || 'all';
+
   const normalizedQuery = query.trim();
   let s2Warning: string | null = null;
 
-  // Run search on arXiv and Semantic Scholar in parallel (with try-catch safety)
+  // Run search conditionally based on engine parameter
+  const fetchArxivPromise = (engine === 'all' || engine === 'arxiv')
+    ? fetchArxiv(normalizedQuery, limit).catch(err => {
+        console.error('arXiv Search Error:', err);
+        return [];
+      })
+    : Promise.resolve([]);
+
+  const fetchS2Promise = (engine === 'all' || engine === 'semanticscholar')
+    ? fetchSemanticScholar(normalizedQuery, limit, s2Key).catch(err => {
+        console.error('Semantic Scholar Search Error:', err);
+        if (err.message?.includes('429')) {
+          s2Warning = 'Semantic Scholar rate limit exceeded (429). Please wait a few minutes or add a Semantic Scholar API Key in Settings to search business papers.';
+        } else {
+          s2Warning = err.message || 'Semantic Scholar search failed.';
+        }
+        return [];
+      })
+    : Promise.resolve([]);
+
   const [arxivResults, s2Results] = await Promise.all([
-    fetchArxiv(normalizedQuery, limit).catch(err => {
-      console.error('arXiv Search Error:', err);
-      return [];
-    }),
-    fetchSemanticScholar(normalizedQuery, limit, s2Key).catch(err => {
-      console.error('Semantic Scholar Search Error:', err);
-      if (err.message?.includes('429')) {
-        s2Warning = 'Semantic Scholar rate limit exceeded (429). Please wait a few minutes or add a Semantic Scholar API Key in Settings to search business papers.';
-      } else {
-        s2Warning = err.message || 'Semantic Scholar search failed.';
-      }
-      return [];
-    })
+    fetchArxivPromise,
+    fetchS2Promise
   ]);
 
   // Merge and deduplicate results by Normalized Title

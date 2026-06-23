@@ -286,7 +286,7 @@ export const PreviewDrawer: React.FC = () => {
           align-items: center;
           gap: 6px;
           font-size: 11px;
-          color: #a5b4fc;
+          color: var(--color-brand);
           margin-bottom: 10px;
         }
         .paper-link:hover {
@@ -348,10 +348,10 @@ export const PreviewDrawer: React.FC = () => {
           margin-bottom: 2px;
         }
         .staged-msg.user-msg {
-          background: rgba(99, 102, 241, 0.15);
+          background: var(--color-brand-glow);
           color: #e0e7ff;
           align-self: flex-end;
-          border: 1px solid rgba(99, 102, 241, 0.2);
+          border: 1px solid var(--border-color-glow);
         }
         .staged-msg.ai-msg {
           background: rgba(148, 163, 184, 0.08);
