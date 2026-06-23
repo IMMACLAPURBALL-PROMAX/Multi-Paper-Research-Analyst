@@ -14,8 +14,8 @@ export async function extractTextFromPdf(
   // This prevents DOMMatrix / browser-only errors during Next.js SSR pre-rendering.
   const pdfjsLib = await import('pdfjs-dist');
   
-  // Configure the worker from a CDN matching the library version
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+  // Configure the worker to use our local copy served from the public folder
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
   const arrayBuffer = await file.arrayBuffer();
   
