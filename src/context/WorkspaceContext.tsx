@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { DocumentSource, ChatMessage, APIKeys, ModelConfig } from '@/types';
 import { db, getSources, addSource, deleteSource, promoteSource, getMessages, addMessage, clearWorkspaceMessages } from '@/lib/db';
 import { extractTextFromPdf } from '@/lib/pdf-extractor';
-import { TFIDFSearchEngine } from '@/lib/tf-idf';
+import { TFIDFSearchEngine, chunkDocument } from '@/lib/tf-idf';
 
 interface WorkspaceContextProps {
   // Sources
@@ -381,17 +381,45 @@ CRITICAL INSTRUCTIONS:
         // 2. Perform document-by-document TF-IDF search to guarantee multi-document context retrieval
         const mergedResults: Array<{ chunk: any; score: number }> = [];
         
+        // Check if query is looking for a summary to apply token-efficient structural retrieval
+        const isSummaryRequest = /summariz|summary|overview|synopsis|what is this.*about|explain/i.test(text);
+        
         // Retrieve 3 to 6 segments per document depending on the total count of documents
         const segmentsPerDoc = Math.max(3, Math.min(6, Math.floor(12 / trustedSources.length)));
         
         for (const doc of trustedSources) {
-          const searchEngine = new TFIDFSearchEngine([doc]);
-          const docResults = searchEngine.search(text, segmentsPerDoc);
-          mergedResults.push(...docResults);
+          const docChunks = chunkDocument(doc);
+          let selectedChunks: any[] = [];
+          
+          if (isSummaryRequest && docChunks.length > 0) {
+            // Retrieve structural chunks (Introduction: first 2; Conclusion: last 1) + query search
+            const intro = docChunks.slice(0, 2);
+            const conclusion = docChunks.length > 2 ? docChunks.slice(-1) : [];
+            const searchEngine = new TFIDFSearchEngine([doc]);
+            const docResults = searchEngine.search(text, 2);
+            
+            const seenIds = new Set<string>();
+            [...intro, ...conclusion].forEach(c => {
+              seenIds.add(c.id);
+              selectedChunks.push(c);
+            });
+            
+            docResults.forEach(res => {
+              if (!seenIds.has(res.chunk.id) && selectedChunks.length < 4) {
+                seenIds.add(res.chunk.id);
+                selectedChunks.push(res.chunk);
+              }
+            });
+          } else {
+            const searchEngine = new TFIDFSearchEngine([doc]);
+            const docResults = searchEngine.search(text, segmentsPerDoc);
+            selectedChunks = docResults.map(r => r.chunk);
+          }
+          
+          selectedChunks.forEach(chunk => {
+            mergedResults.push({ chunk, score: 1 });
+          });
         }
-
-        // Sort the combined results by their scores so the most relevant overall are ordered first
-        mergedResults.sort((a, b) => b.score - a.score);
 
         // Append segments as context
         systemInstruction += `\n\nTrusted Sources Context Excerpts (Use these excerpts to answer specific queries and reference them using Document citation numbers from the active catalog above, e.g. Document [1]):\n`;
@@ -485,12 +513,39 @@ Do NOT rely on your pre-training knowledge or parametric memory to answer questi
       docContext += `Authors: ${paper.authors.join(', ')}\n`;
       
       if (paper.fullTextContent) {
-        // Run TF-IDF search on just this single staged paper
-        const searchEngine = new TFIDFSearchEngine([paper]);
-        const results = searchEngine.search(text, 5);
+        const docChunks = chunkDocument(paper);
+        let selectedChunks: any[] = [];
+        const isSummaryRequest = /summariz|summary|overview|synopsis|what is this.*about|explain/i.test(text);
+        
+        if (isSummaryRequest && docChunks.length > 0) {
+          // Retrieve structural chunks (Introduction: first 2; Conclusion: last 2) + query search
+          const intro = docChunks.slice(0, 2);
+          const conclusion = docChunks.length > 2 ? docChunks.slice(-2) : [];
+          const searchEngine = new TFIDFSearchEngine([paper]);
+          const results = searchEngine.search(text, 2);
+          
+          const seenIds = new Set<string>();
+          [...intro, ...conclusion].forEach(c => {
+            seenIds.add(c.id);
+            selectedChunks.push(c);
+          });
+          
+          results.forEach(res => {
+            if (!seenIds.has(res.chunk.id) && selectedChunks.length < 6) {
+              seenIds.add(res.chunk.id);
+              selectedChunks.push(res.chunk);
+            }
+          });
+        } else {
+          // Run standard TF-IDF search
+          const searchEngine = new TFIDFSearchEngine([paper]);
+          const results = searchEngine.search(text, 5);
+          selectedChunks = results.map(r => r.chunk);
+        }
+        
         docContext += `\nRelevant text segments from this paper:\n`;
-        results.forEach((res, i) => {
-          docContext += `Excerpt ${i+1}:\n${res.chunk.text}\n\n`;
+        selectedChunks.forEach((chunk, i) => {
+          docContext += `Excerpt ${i+1}:\n${chunk.text}\n\n`;
         });
       } else {
         docContext += `\nAbstract:\n${paper.abstract}\n`;
