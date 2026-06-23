@@ -97,8 +97,10 @@ export async function GET(request: Request) {
   const query = searchParams.get('q');
   const limit = parseInt(searchParams.get('limit') || '10', 10);
   
-  // Read Semantic Scholar Key from headers
-  const s2Key = request.headers.get('x-semanticscholar-key') || undefined;
+  // Read Semantic Scholar Key from headers, falling back to the developer key
+  const s2Key = request.headers.get('x-semanticscholar-key') || 
+                process.env.SEMANTIC_SCHOLAR_API_KEY || 
+                's2k-IgaFq5lzt3YyD5IF0tSJRJSspaEHVhHWx4NzEY3y';
 
   if (!query) {
     return NextResponse.json({ error: 'Search query parameter "q" is required.' }, { status: 400 });
