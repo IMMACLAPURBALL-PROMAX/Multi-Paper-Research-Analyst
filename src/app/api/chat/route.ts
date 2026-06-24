@@ -319,7 +319,7 @@ async function getPipeline() {
     env.allowLocalModels = false; 
     env.cacheDir = "/tmp/.cache";
     (env.backends as any).setPriority(['wasm', 'cpu']);
-    pipelineInstance = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { quantized: true });
+    pipelineInstance = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { dtype: 'q8' });
   }
   return pipelineInstance;
 }

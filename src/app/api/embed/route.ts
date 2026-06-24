@@ -16,7 +16,7 @@ async function getPipeline() {
     (env.backends as any).setPriority(['wasm', 'cpu']);
     
     pipelineInstance = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
-      quantized: true,
+      dtype: 'q8',
     });
   }
   return pipelineInstance;
