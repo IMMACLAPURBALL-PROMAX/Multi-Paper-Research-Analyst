@@ -315,8 +315,10 @@ async function searchWeb(query: string): Promise<string[]> {
 let pipelineInstance: any = null;
 async function getPipeline() {
   if (!pipelineInstance) {
-    const { pipeline, env } = await import('@xenova/transformers');
+    const { pipeline, env } = await import('@huggingface/transformers');
     env.allowLocalModels = false; 
+    env.cacheDir = "/tmp/.cache";
+    (env.backends as any).setPriority(['wasm', 'cpu']);
     pipelineInstance = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { quantized: true });
   }
   return pipelineInstance;
