@@ -8,7 +8,8 @@ async function executeGeminiRequest(
   messages: any[], 
   systemInstruction?: string,
   temperature?: number,
-  maxTokens?: number
+  maxTokens?: number,
+  enableSearch?: boolean
 ) {
   const contents = messages.map(msg => {
     const parts = [{ text: msg.content }];
@@ -43,6 +44,10 @@ async function executeGeminiRequest(
       maxOutputTokens: maxTokens ?? 2048,
     }
   };
+
+  if (enableSearch) {
+    payload.tools = [{ google_search: {} }];
+  }
 
   if (systemInstruction) {
     payload.systemInstruction = {
@@ -185,8 +190,9 @@ async function executeOpenAIRequest(
   }));
 
   let url = 'https://api.openai.com/v1/chat/completions';
-  if (apiKey.startsWith('ghp_') || apiKey.startsWith('github_pat_')) {
-    url = 'https://models.inference.ai.azure.com/chat/completions';
+  const isGitHub = apiKey.startsWith('ghp_') || apiKey.startsWith('github_pat_');
+  if (isGitHub) {
+    url = 'https://models.github.ai/inference/chat/completions';
   }
 
   const payload = {
@@ -196,12 +202,19 @@ async function executeOpenAIRequest(
     max_tokens: maxTokens ?? 2048
   };
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${apiKey}`
+  };
+
+  if (isGitHub) {
+    headers['Accept'] = 'application/vnd.github+json';
+    headers['X-GitHub-Api-Version'] = '2022-11-28';
+  }
+
   const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
+    headers,
     body: JSON.stringify(payload)
   });
 
@@ -240,11 +253,45 @@ if (!globalAny.openaiBreaker) {
   });
 }
 
+// Helper to perform web search using DuckDuckGo HTML
+async function searchWeb(query: string): Promise<string[]> {
+  try {
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    if (!response.ok) return [];
+    const html = await response.text();
+    const snippetRegex = /<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+    let match;
+    const snippets: string[] = [];
+    while ((match = snippetRegex.exec(html)) !== null && snippets.length < 5) {
+      const snippet = match[1]
+        .replace(/<[^>]*>/g, '')
+        .replace(/&#x27;/g, "'")
+        .replace(/&amp;/g, "&")
+        .replace(/&quot;/g, '"')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .trim();
+      if (snippet) {
+        snippets.push(snippet);
+      }
+    }
+    return snippets;
+  } catch (err) {
+    console.error("DuckDuckGo search error:", err);
+    return [];
+  }
+}
+
 // POST endpoint handler
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { messages, systemInstruction, provider, temperature, maxTokens } = body;
+    const { messages, systemInstruction, provider, temperature, maxTokens, enableSearch } = body;
     let { model } = body;
 
     if (model) {
@@ -263,6 +310,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing or invalid "messages" in request body.' }, { status: 400 });
     }
 
+    // Log RAG details on the server terminal
+    console.log("=== API CHAT SERVER RAG LOG ===");
+    console.log("Provider:", provider, "| Model:", model);
+    console.log("System Instruction Length:", systemInstruction ? systemInstruction.length : 0);
+    if (systemInstruction) {
+      console.log("System Instruction Preview:\n", systemInstruction.substring(0, 1200));
+    }
+    console.log("=================================");
+
     // -------------------------------------------------------------
     // Case A: Load Balancing / Auto Mode
     // -------------------------------------------------------------
@@ -275,7 +331,7 @@ export async function POST(request: Request) {
         breaker: any;
       }> = [];
 
-      if (geminiKey) {
+      if (geminiKey && geminiKey.trim() !== '') {
         pool.push({
           provider: 'gemini',
           apiKey: geminiKey,
@@ -284,7 +340,7 @@ export async function POST(request: Request) {
           breaker: globalAny.geminiBreaker
         });
       }
-      if (anthropicKey) {
+      if (anthropicKey && anthropicKey.trim() !== '') {
         pool.push({
           provider: 'claude',
           apiKey: anthropicKey,
@@ -293,7 +349,7 @@ export async function POST(request: Request) {
           breaker: globalAny.claudeBreaker
         });
       }
-      if (openaiKey) {
+      if (openaiKey && openaiKey.trim() !== '') {
         const isGitHub = openaiKey.startsWith('ghp_') || openaiKey.startsWith('github_pat_');
         pool.push({
           provider: 'openai',
@@ -351,15 +407,35 @@ export async function POST(request: Request) {
           continue;
         }
 
+        let finalInstruction = systemInstruction;
+        let isGeminiSearch = false;
+        
+        if (enableSearch) {
+          if (endpoint.provider === 'gemini') {
+            isGeminiSearch = true;
+          } else {
+            const lastUserMessage = messages.slice().reverse().find((msg: any) => msg.sender === 'user' || msg.role === 'user')?.content || '';
+            if (lastUserMessage) {
+              console.log(`[Search Grounding] Load Balancer fetching web search for: "${lastUserMessage}"`);
+              const searchResults = await searchWeb(lastUserMessage);
+              if (searchResults.length > 0) {
+                finalInstruction = (systemInstruction || '') + `\n\nWEB SEARCH RESULTS FOR GROUNDING (use these search results to answer the user's query since some documents in their corpus are scanned copies without selectable text layers):\n` +
+                  searchResults.map((snippet, i) => `Result [${i + 1}]: "${snippet}"`).join('\n') + `\n\n`;
+              }
+            }
+          }
+        }
+
         try {
           console.log(`[Load Balancer] Attempt ${attempt + 1}: Routing to ${endpoint.provider} (${endpoint.model})`);
           content = await endpoint.breaker.fire(
             endpoint.apiKey,
             endpoint.model,
             messages,
-            systemInstruction,
+            finalInstruction,
             temperature,
-            maxTokens
+            maxTokens,
+            isGeminiSearch
           );
           success = true;
           break;
@@ -387,12 +463,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing "model" in request body.' }, { status: 400 });
     }
 
+    let enrichedSystemInstruction = systemInstruction || '';
+    if (enableSearch && provider !== 'gemini') {
+      const lastUserMessage = messages.slice().reverse().find((msg: any) => msg.sender === 'user' || msg.role === 'user')?.content || '';
+      if (lastUserMessage) {
+        console.log(`[Search Grounding] Direct routing fetching web search for: "${lastUserMessage}"`);
+        const searchResults = await searchWeb(lastUserMessage);
+        if (searchResults.length > 0) {
+          enrichedSystemInstruction += `\n\nWEB SEARCH RESULTS FOR GROUNDING (use these search results to answer the user's query since some documents in their corpus are scanned copies without selectable text layers):\n` +
+            searchResults.map((snippet, i) => `Result [${i + 1}]: "${snippet}"`).join('\n') + `\n\n`;
+        }
+      }
+    }
+
     if (provider === 'gemini') {
       if (!geminiKey) {
         return NextResponse.json({ error: 'Gemini API Key is missing. Please configure it in Settings.' }, { status: 400 });
       }
       try {
-        const text = await globalAny.geminiBreaker.fire(geminiKey, model, messages, systemInstruction, temperature, maxTokens);
+        const text = await globalAny.geminiBreaker.fire(geminiKey, model, messages, systemInstruction, temperature, maxTokens, enableSearch);
         return NextResponse.json({ content: text });
       } catch (err: any) {
         return NextResponse.json({ 
@@ -406,7 +495,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Claude API Key is missing. Please configure it in Settings.' }, { status: 400 });
       }
       try {
-        const text = await globalAny.claudeBreaker.fire(anthropicKey, model, messages, systemInstruction, temperature, maxTokens);
+        const text = await globalAny.claudeBreaker.fire(anthropicKey, model, messages, enrichedSystemInstruction, temperature, maxTokens);
         return NextResponse.json({ content: text });
       } catch (err: any) {
         return NextResponse.json({ 
@@ -420,7 +509,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'OpenAI/GitHub Key is missing. Please configure it in Settings.' }, { status: 400 });
       }
       try {
-        const text = await globalAny.openaiBreaker.fire(openaiKey, model, messages, systemInstruction, temperature, maxTokens);
+        const text = await globalAny.openaiBreaker.fire(openaiKey, model, messages, enrichedSystemInstruction, temperature, maxTokens);
         return NextResponse.json({ content: text });
       } catch (err: any) {
         return NextResponse.json({ 

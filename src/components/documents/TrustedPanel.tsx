@@ -125,7 +125,12 @@ export const TrustedPanel: React.FC<TrustedPanelProps> = ({ onOpenSettings }) =>
                 style={{ cursor: 'pointer' }}
               >
                 <div className="source-info">
-                  <h3 className="source-title" title={doc.title}>{doc.title}</h3>
+                  <h3 className="source-title" title={doc.title}>
+                    {doc.title}
+                    {doc.hasNoText && (
+                      <span className="scanned-badge" title="No selectable text layer found in this PDF">Scanned</span>
+                    )}
+                  </h3>
                   <p className="source-meta">
                     {doc.authors.slice(0, 2).join(', ')}
                     {doc.authors.length > 2 && ' et al.'}
@@ -397,6 +402,21 @@ export const TrustedPanel: React.FC<TrustedPanelProps> = ({ onOpenSettings }) =>
           overflow: hidden;
           text-overflow: ellipsis;
           margin-bottom: 2px;
+          display: flex;
+          align-items: center;
+        }
+        .scanned-badge {
+          display: inline-block;
+          font-size: 8px;
+          font-weight: 700;
+          color: #f59e0b;
+          background: rgba(245, 158, 11, 0.12);
+          border: 1px solid rgba(245, 158, 11, 0.2);
+          padding: 1px 4px;
+          border-radius: var(--radius-sm);
+          margin-left: 6px;
+          vertical-align: middle;
+          flex-shrink: 0;
         }
         .source-meta {
           font-size: 11px;

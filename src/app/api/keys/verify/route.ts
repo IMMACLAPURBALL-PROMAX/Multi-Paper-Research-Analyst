@@ -46,11 +46,13 @@ export async function POST(request: Request) {
       const isGitHub = apiKey.startsWith('ghp_') || apiKey.startsWith('github_pat_');
       
       if (isGitHub) {
-        const url = 'https://models.inference.ai.azure.com/chat/completions';
+        const url = 'https://models.github.ai/inference/chat/completions';
         const res = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
             'Authorization': `Bearer ${apiKey}`
           },
           body: JSON.stringify({

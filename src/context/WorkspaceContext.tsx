@@ -192,6 +192,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setUploadProgress({ processed, total });
       });
 
+      const cleanText = fullText.replace(/--- Page \d+ (?:Extraction Failed )?---/g, '').trim();
+      const hasNoText = cleanText.length < 100;
+
       // Simple metadata parse
       const paperId = `upload_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       const authors = ['Local Upload'];
@@ -210,7 +213,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           venue: 'My Notebook'
         },
         status: 'promoted', // Local uploads go directly into trusted area
-        addedAt: Date.now()
+        addedAt: Date.now(),
+        hasNoText
       };
 
       await addSource(newDoc);
@@ -303,7 +307,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   // Helper to fetch chat completion
-  const executeChatRequest = async (messages: ChatMessage[], systemInstruction?: string) => {
+  const executeChatRequest = async (messages: ChatMessage[], systemInstruction?: string, enableSearch = false) => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -320,7 +324,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         provider: modelConfig.provider,
         model: modelConfig.model,
         temperature: modelConfig.temperature,
-        maxTokens: modelConfig.maxTokens
+        maxTokens: modelConfig.maxTokens,
+        enableSearch
       })
     });
 
@@ -444,10 +449,23 @@ Do NOT rely on your pre-training knowledge or parametric memory to answer questi
         systemInstruction += `\nNo documents have been promoted to the trusted notebook yet.`;
       }
 
+      // Log RAG details for server-side debugging
+      console.log("=================== RAG DEBUGGER ===================");
+      console.log(`Trusted Sources count: ${trustedSources.length}`);
+      trustedSources.forEach((d, idx) => {
+        console.log(`Paper [${idx + 1}]: "${d.title}" | FullText: ${d.fullTextContent ? d.fullTextContent.length : 0} chars | Abstract: ${d.abstract ? d.abstract.length : 0} chars`);
+      });
+      console.log(`Grounded Sources count: ${groundedSources.length}`);
+      groundedSources.forEach((s, idx) => {
+        console.log(`Grounded [${idx + 1}]: "${s.title}" (ID: ${s.id})`);
+      });
+      console.log("====================================================");
+
       // Query AI provider proxy
       // Provide conversational history (limit to last 10 messages to save context/tokens)
       const conversationalHistory = [...mainChatHistory, userMsg].slice(-10);
-      const aiReply = await executeChatRequest(conversationalHistory, systemInstruction);
+      const hasScannedDoc = trustedSources.some(doc => doc.hasNoText);
+      const aiReply = await executeChatRequest(conversationalHistory, systemInstruction, hasScannedDoc);
 
       // Create assistant reply
       const assistantMsg: ChatMessage = {
@@ -565,8 +583,9 @@ ${docContext}
 
       const currentStagedHistory = stagedChats[paperId] || [];
       const conversation = [...currentStagedHistory, userMsg].slice(-8);
+      const isScanned = !!paper.hasNoText;
 
-      const aiReply = await executeChatRequest(conversation, systemInstruction);
+      const aiReply = await executeChatRequest(conversation, systemInstruction, isScanned);
 
       const assistantMsg: ChatMessage = {
         id: `msg_${Date.now() + 1}`,

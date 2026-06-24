@@ -56,6 +56,17 @@ export const PreviewDrawer: React.FC = () => {
       </div>
 
       <div className="drawer-body">
+        {/* Scanned Document Warning */}
+        {paper.hasNoText && (
+          <div className="scanned-warning-banner">
+            <span className="warning-icon">⚠️</span>
+            <div className="warning-text">
+              <strong>Scanned PDF / Image-only Document</strong>
+              <p>No selectable text layer was detected. Context queries and mind maps will only utilize this document's title and metadata.</p>
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="drawer-actions">
           {isPromoted ? (
@@ -416,6 +427,34 @@ export const PreviewDrawer: React.FC = () => {
           color: #10b981;
           font-size: 11px;
           font-weight: 700;
+        }
+
+        /* Scanned warning banner styling */
+        .scanned-warning-banner {
+          display: flex;
+          gap: 10px;
+          padding: 10px 12px;
+          background: rgba(245, 158, 11, 0.08);
+          border: 1px solid rgba(245, 158, 11, 0.25);
+          border-radius: var(--radius-md);
+          margin-bottom: 12px;
+          color: #f59e0b;
+        }
+        .scanned-warning-banner .warning-icon {
+          font-size: 16px;
+          margin-top: 1px;
+        }
+        .scanned-warning-banner .warning-text strong {
+          display: block;
+          font-size: 11px;
+          font-weight: 700;
+          margin-bottom: 2px;
+        }
+        .scanned-warning-banner .warning-text p {
+          margin: 0;
+          font-size: 10px;
+          line-height: 1.4;
+          color: var(--text-secondary);
         }
       `}</style>
     </div>

@@ -18,6 +18,7 @@ export interface DocumentSource {
   metadata: PaperMetadata;
   status: 'staged' | 'promoted';
   addedAt: number;
+  hasNoText?: boolean; // True if PDF text layer is empty (scanned PDF)
 }
 
 export interface ChatMessage {
