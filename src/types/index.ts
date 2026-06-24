@@ -35,10 +35,15 @@ export interface APIKeys {
   claude?: string;
   openai?: string;
   semanticScholar?: string;
+  verified?: {
+    gemini?: boolean;
+    claude?: boolean;
+    openai?: boolean;
+  };
 }
 
 export interface ModelConfig {
-  provider: 'gemini' | 'claude' | 'openai';
+  provider: 'gemini' | 'claude' | 'openai' | 'auto';
   model: string;
   temperature: number;
   maxTokens: number;

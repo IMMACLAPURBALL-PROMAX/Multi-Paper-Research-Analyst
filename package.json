@@ -13,12 +13,16 @@
     "lucide-react": "^1.21.0",
     "mermaid": "^11.15.0",
     "next": "16.2.9",
+    "node-fetch": "^3.3.2",
+    "opossum": "^10.0.0",
     "pdfjs-dist": "^6.0.227",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "@types/node-fetch": "^2.6.13",
+    "@types/opossum": "^8.1.9",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

@@ -38,6 +38,13 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
   const [showClaude, setShowClaude] = useState(false);
   const [showOpenai, setShowOpenai] = useState(false);
   
+  const [geminiVerified, setGeminiVerified] = useState<boolean | null>(null);
+  const [claudeVerified, setClaudeVerified] = useState<boolean | null>(null);
+  const [openaiVerified, setOpenaiVerified] = useState<boolean | null>(null);
+  
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState('');
+  
   const [provider, setProvider] = useState(modelConfig.provider);
   const [model, setModel] = useState(modelConfig.model);
   const [temperature, setTemperature] = useState(modelConfig.temperature ?? 0.2);
@@ -49,6 +56,9 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
       setGeminiKey(apiKeys.gemini || '');
       setClaudeKey(apiKeys.claude || '');
       setOpenaiKey(apiKeys.openai || '');
+      setGeminiVerified(apiKeys.verified?.gemini ?? (apiKeys.gemini ? true : null));
+      setClaudeVerified(apiKeys.verified?.claude ?? (apiKeys.claude ? true : null));
+      setOpenaiVerified(apiKeys.verified?.openai ?? (apiKeys.openai ? true : null));
       setProvider(modelConfig.provider);
       setModel(modelConfig.model);
       setTemperature(modelConfig.temperature ?? 0.2);
@@ -61,7 +71,12 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
     const models = getAvailableModels({
       gemini: geminiKey,
       claude: claudeKey,
-      openai: openaiKey
+      openai: openaiKey,
+      verified: {
+        gemini: geminiVerified === true,
+        claude: claudeVerified === true,
+        openai: openaiVerified === true
+      }
     });
     if (models.length > 0) {
       const exists = models.some(m => m.id === model && m.provider === provider);
@@ -70,7 +85,7 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
         setModel(models[0].id);
       }
     }
-  }, [geminiKey, claudeKey, openaiKey, model, provider]);
+  }, [geminiKey, claudeKey, openaiKey, geminiVerified, claudeVerified, openaiVerified, model, provider]);
 
   const handleModelSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const [selectedProvider, selectedId] = e.target.value.split(':');
@@ -80,12 +95,46 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
     }
   };
 
+  const handleVerifyKey = async (
+    providerName: 'gemini' | 'claude' | 'openai',
+    key: string,
+    setVerified: (v: boolean | null) => void
+  ) => {
+    if (!key.trim()) return;
+    setIsVerifying(true);
+    setVerifyError('');
+    try {
+      const res = await fetch('/api/keys/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: providerName, apiKey: key.trim() })
+      });
+      const data = await res.json();
+      if (res.ok && data.valid) {
+        setVerified(true);
+      } else {
+        setVerified(false);
+        setVerifyError(data.error || 'Failed to verify API Key.');
+      }
+    } catch (err: any) {
+      setVerified(false);
+      setVerifyError(err.message || 'Error communicating with verification service.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   const handleSave = () => {
     updateApiKeys({
       gemini: geminiKey.trim() || undefined,
       claude: claudeKey.trim() || undefined,
       openai: openaiKey.trim() || undefined,
-      semanticScholar: apiKeys.semanticScholar
+      semanticScholar: apiKeys.semanticScholar,
+      verified: {
+        gemini: geminiVerified === true,
+        claude: claudeVerified === true,
+        openai: openaiVerified === true
+      }
     });
     
     updateModelConfig({
@@ -126,9 +175,27 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
             <div className="model-selector-row">
               <div className="select-wrapper flex-grow">
                 <label>Active Model</label>
-                {getAvailableModels({ gemini: geminiKey, claude: claudeKey, openai: openaiKey }).length > 0 ? (
+                {getAvailableModels({
+                  gemini: geminiKey,
+                  claude: claudeKey,
+                  openai: openaiKey,
+                  verified: {
+                    gemini: geminiVerified === true,
+                    claude: claudeVerified === true,
+                    openai: openaiVerified === true
+                  }
+                }).length > 0 ? (
                   <select value={`${provider}:${model}`} onChange={handleModelSelectChange}>
-                    {getAvailableModels({ gemini: geminiKey, claude: claudeKey, openai: openaiKey }).map((m) => (
+                    {getAvailableModels({
+                      gemini: geminiKey,
+                      claude: claudeKey,
+                      openai: openaiKey,
+                      verified: {
+                        gemini: geminiVerified === true,
+                        claude: claudeVerified === true,
+                        openai: openaiVerified === true
+                      }
+                    }).map((m) => (
                       <option key={`${m.provider}:${m.id}`} value={`${m.provider}:${m.id}`}>
                         {m.name}
                       </option>
@@ -136,12 +203,11 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
                   </select>
                 ) : (
                   <select disabled>
-                    <option value="">No keys configured (Setup keys below to unlock models)</option>
+                    <option value="">No verified API keys configured (Setup keys below)</option>
                   </select>
                 )}
               </div>
             </div>
-
             <div className="params-row" style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
               <div className="select-wrapper flex-grow" style={{ display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -183,21 +249,37 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
             <div className="input-key-wrapper">
               <div className="key-header">
                 <label>Google Gemini API Key</label>
-                {geminiKey && <span className="key-indicator active">Configured</span>}
+                {geminiKey && (
+                  geminiVerified === true ? <span className="key-indicator active">Verified</span> :
+                  geminiVerified === false ? <span className="key-indicator error">Invalid</span> :
+                  <span className="key-indicator warning">Unverified</span>
+                )}
               </div>
               <div className="input-action-row">
                 <input
                   type={showGemini ? 'text' : 'password'}
                   placeholder="AIzaSy..."
                   value={geminiKey}
-                  onChange={(e) => setGeminiKey(e.target.value)}
+                  onChange={(e) => {
+                    setGeminiKey(e.target.value);
+                    setGeminiVerified(null);
+                  }}
                 />
                 <button 
+                  type="button"
                   className="btn-eye" 
                   onClick={() => setShowGemini(!showGemini)}
                   title={showGemini ? "Hide Key" : "Show Key"}
                 >
                   {showGemini ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+                <button 
+                  type="button"
+                  className="btn-verify" 
+                  onClick={() => handleVerifyKey('gemini', geminiKey, setGeminiVerified)}
+                  disabled={!geminiKey.trim() || isVerifying}
+                >
+                  Verify
                 </button>
               </div>
             </div>
@@ -206,44 +288,76 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
             <div className="input-key-wrapper">
               <div className="key-header">
                 <label>Anthropic Claude API Key</label>
-                {claudeKey && <span className="key-indicator active">Configured</span>}
+                {claudeKey && (
+                  claudeVerified === true ? <span className="key-indicator active">Verified</span> :
+                  claudeVerified === false ? <span className="key-indicator error">Invalid</span> :
+                  <span className="key-indicator warning">Unverified</span>
+                )}
               </div>
               <div className="input-action-row">
                 <input
                   type={showClaude ? 'text' : 'password'}
                   placeholder="sk-ant-..."
                   value={claudeKey}
-                  onChange={(e) => setClaudeKey(e.target.value)}
+                  onChange={(e) => {
+                    setClaudeKey(e.target.value);
+                    setClaudeVerified(null);
+                  }}
                 />
                 <button 
+                  type="button"
                   className="btn-eye" 
                   onClick={() => setShowClaude(!showClaude)}
                   title={showClaude ? "Hide Key" : "Show Key"}
                 >
                   {showClaude ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
+                <button 
+                  type="button"
+                  className="btn-verify" 
+                  onClick={() => handleVerifyKey('claude', claudeKey, setClaudeVerified)}
+                  disabled={!claudeKey.trim() || isVerifying}
+                >
+                  Verify
+                </button>
               </div>
             </div>
 
-            {/* OpenAI key */}
+            {/* OpenAI / GitHub key */}
             <div className="input-key-wrapper">
               <div className="key-header">
-                <label>OpenAI API Key</label>
-                {openaiKey && <span className="key-indicator active">Configured</span>}
+                <label>OpenAI Key / GitHub PAT</label>
+                {openaiKey && (
+                  openaiVerified === true ? <span className="key-indicator active">Verified</span> :
+                  openaiVerified === false ? <span className="key-indicator error">Invalid</span> :
+                  <span className="key-indicator warning">Unverified</span>
+                )}
               </div>
               <div className="input-action-row">
                 <input
                   type={showOpenai ? 'text' : 'password'}
-                  placeholder="sk-..."
+                  placeholder="sk-... or ghp_..."
                   value={openaiKey}
-                  onChange={(e) => setOpenaiKey(e.target.value)}
+                  onChange={(e) => {
+                    setOpenaiKey(e.target.value);
+                    setOpenaiVerified(null);
+                  }}
                 />
                 <button 
+                  type="button"
                   className="btn-eye" 
                   onClick={() => setShowOpenai(!showOpenai)}
                   title={showOpenai ? "Hide Key" : "Show Key"}
                 >
                   {showOpenai ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+                <button 
+                  type="button"
+                  className="btn-verify" 
+                  onClick={() => handleVerifyKey('openai', openaiKey, setOpenaiVerified)}
+                  disabled={!openaiKey.trim() || isVerifying}
+                >
+                  Verify
                 </button>
               </div>
             </div>
@@ -450,6 +564,16 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
           color: #a7f3d0;
           border: 1px solid rgba(16, 185, 129, 0.2);
         }
+        .key-indicator.warning {
+          background: rgba(245, 158, 11, 0.12);
+          color: #fde68a;
+          border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+        .key-indicator.error {
+          background: rgba(239, 68, 68, 0.12);
+          color: #fca5a5;
+          border: 1px solid rgba(239, 68, 68, 0.2);
+        }
         .input-action-row {
           display: flex;
           gap: 8px;
@@ -473,6 +597,64 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
           color: var(--text-primary);
           border-color: var(--text-muted);
         }
+        .btn-verify {
+          background: rgba(99, 102, 241, 0.08);
+          border: 1px solid rgba(99, 102, 241, 0.3);
+          color: var(--color-brand);
+          font-size: 11px;
+          font-weight: 600;
+          padding: 0 12px;
+          border-radius: var(--radius-md);
+          cursor: pointer;
+          transition: all var(--transition-fast);
+        }
+        .btn-verify:hover:not(:disabled) {
+          background: var(--color-brand);
+          color: #fff;
+          border-color: var(--color-brand);
+        }
+        .btn-verify:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+        .verify-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          background: rgba(4, 7, 15, 0.8);
+          backdrop-filter: blur(4px);
+          z-index: 1100;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .verify-popup {
+          padding: 24px;
+          border-radius: var(--radius-lg);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 16px;
+          width: 90%;
+          max-width: 320px;
+          text-align: center;
+          box-shadow: var(--shadow-lg), var(--shadow-glow);
+          background: #0b0f19;
+          border: 1px solid var(--border-color);
+        }
+        .buffer-loop {
+          width: 36px;
+          height: 36px;
+          border: 3px solid rgba(99, 102, 241, 0.2);
+          border-top-color: var(--color-brand);
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
         .modal-footer {
           display: flex;
           justify-content: flex-end;
@@ -482,6 +664,28 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
           background: rgba(10, 15, 29, 0.5);
         }
       `}</style>
+      
+      {isVerifying && (
+        <div className="verify-overlay">
+          <div className="verify-popup glass-panel">
+            <div className="buffer-loop"></div>
+            <p style={{ fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Verifying API Key...</p>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0 }}>Checking credentials with provider endpoint...</p>
+          </div>
+        </div>
+      )}
+      
+      {verifyError && (
+        <div className="verify-overlay" onClick={() => setVerifyError('')}>
+          <div className="verify-popup glass-panel" style={{ border: '1px solid rgba(239, 68, 68, 0.4)', maxWidth: '340px' }} onClick={e => e.stopPropagation()}>
+            <p style={{ fontWeight: 600, color: '#fca5a5', margin: 0 }}>Verification Failed</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '8px 0' }}>{verifyError}</p>
+            <button className="btn-secondary" onClick={() => setVerifyError('')} style={{ padding: '6px 14px', fontSize: '11px', marginTop: '4px' }}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
