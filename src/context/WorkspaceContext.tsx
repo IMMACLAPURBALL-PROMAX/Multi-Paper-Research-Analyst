@@ -3,8 +3,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { DocumentSource, ChatMessage, APIKeys, ModelConfig } from '@/types';
 import { db, getSources, addSource, deleteSource, promoteSource, getMessages, addMessage, clearWorkspaceMessages } from '@/lib/db';
-import { extractTextFromPdf } from '@/lib/pdf-extractor';
-import { TFIDFSearchEngine, chunkDocument } from '@/lib/tf-idf';
+import { chunkMarkdown } from '@/lib/vector-search';
 
 interface WorkspaceContextProps {
   // Sources
@@ -181,30 +180,60 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     sessionStorage.setItem('research_model_config', JSON.stringify(config));
   };
 
-  // 3. Document upload
   const uploadPDF = async (file: File) => {
     setIsUploading(true);
-    setUploadProgress({ processed: 0, total: 100 });
+    setUploadProgress({ processed: 10, total: 100 });
     setChatError(null);
     try {
-      // Extract text client-side
-      const fullText = await extractTextFromPdf(file, (processed, total) => {
-        setUploadProgress({ processed, total });
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // 1. Parse PDF to Markdown
+      const parseRes = await fetch('/api/parse', {
+        method: 'POST',
+        body: formData
       });
+      
+      if (!parseRes.ok) {
+        throw new Error('Failed to parse PDF on the server.');
+      }
+      
+      const { markdown } = await parseRes.json();
+      setUploadProgress({ processed: 50, total: 100 });
 
-      const cleanText = fullText.replace(/--- Page \d+ (?:Extraction Failed )?---/g, '').trim();
-      const hasNoText = cleanText.length < 100;
-
-      // Simple metadata parse
       const paperId = `upload_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const title = file.name.replace(/\.[^/.]+$/, "");
+
+      // 2. Chunk Markdown
+      let chunks = chunkMarkdown(paperId, title, markdown);
+      
+      // 3. Embed Chunks
+      if (chunks.length > 0) {
+        const embedRes = await fetch('/api/embed', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ texts: chunks.map(c => c.text) })
+        });
+        
+        if (embedRes.ok) {
+          const { embeddings } = await embedRes.json();
+          chunks = chunks.map((c, i) => ({ ...c, embedding: embeddings[i] }));
+        } else {
+          console.error("Failed to generate embeddings, chunks will lack vectors.");
+        }
+      }
+      
+      setUploadProgress({ processed: 100, total: 100 });
+
       const authors = ['Local Upload'];
       
       const newDoc: DocumentSource = {
         id: paperId,
-        title: file.name.replace(/\.[^/.]+$/, ""), // Strip extension
+        title,
         authors,
         abstract: `Uploaded PDF file: ${file.name}. Size: ${(file.size / 1024 / 1024).toFixed(2)} MB.`,
-        fullTextContent: fullText,
+        fullTextContent: markdown,
+        chunks, // Save semantic chunks and embeddings
         metadata: {
           url: '',
           pdfUrl: '',
@@ -212,9 +241,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           publishedYear: new Date().getFullYear(),
           venue: 'My Notebook'
         },
-        status: 'promoted', // Local uploads go directly into trusted area
-        addedAt: Date.now(),
-        hasNoText
+        status: 'promoted',
+        addedAt: Date.now()
       };
 
       await addSource(newDoc);
@@ -307,7 +335,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   // Helper to fetch chat completion
-  const executeChatRequest = async (messages: ChatMessage[], systemInstruction?: string, enableSearch = false) => {
+  const executeChatRequest = async (messages: ChatMessage[], systemInstruction?: string, enableSearch = false, chunks: any[] = []) => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -325,7 +353,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         model: modelConfig.model,
         temperature: modelConfig.temperature,
         maxTokens: modelConfig.maxTokens,
-        enableSearch
+        enableSearch,
+        chunks
       })
     });
 
@@ -372,6 +401,7 @@ CRITICAL INSTRUCTIONS:
 `;
 
       let groundedSources: Array<{ id: string; title: string }> = [];
+      const conversationalHistory = [...mainChatHistory, userMsg].slice(-10);
 
       if (trustedSources.length > 0) {
         // 1. Inject a global catalog of active notebook documents with their abstracts
@@ -383,105 +413,61 @@ CRITICAL INSTRUCTIONS:
           systemInstruction += `Abstract: ${doc.abstract || 'No abstract available.'}\n`;
         });
 
-        // 2. Perform document-by-document TF-IDF search to guarantee multi-document context retrieval
-        const mergedResults: Array<{ chunk: any; score: number }> = [];
-        
-        // Check if query is looking for a summary to apply token-efficient structural retrieval
-        const isSummaryRequest = /summariz|summary|overview|synopsis|what is this.*about|explain/i.test(text);
-        
-        // Retrieve 3 to 6 segments per document depending on the total count of documents
-        const segmentsPerDoc = Math.max(3, Math.min(6, Math.floor(12 / trustedSources.length)));
-        
-        for (const doc of trustedSources) {
-          const docChunks = chunkDocument(doc);
-          let selectedChunks: any[] = [];
-          
-          if (isSummaryRequest && docChunks.length > 0) {
-            // Retrieve structural chunks (Introduction: first 2; Conclusion: last 1) + query search
-            const intro = docChunks.slice(0, 2);
-            const conclusion = docChunks.length > 2 ? docChunks.slice(-1) : [];
-            const searchEngine = new TFIDFSearchEngine([doc]);
-            const docResults = searchEngine.search(text, 2);
-            
-            const seenIds = new Set<string>();
-            [...intro, ...conclusion].forEach(c => {
-              seenIds.add(c.id);
-              selectedChunks.push(c);
-            });
-            
-            docResults.forEach(res => {
-              if (!seenIds.has(res.chunk.id) && selectedChunks.length < 4) {
-                seenIds.add(res.chunk.id);
-                selectedChunks.push(res.chunk);
-              }
-            });
-          } else {
-            const searchEngine = new TFIDFSearchEngine([doc]);
-            const docResults = searchEngine.search(text, segmentsPerDoc);
-            selectedChunks = docResults.map(r => r.chunk);
-          }
-          
-          selectedChunks.forEach(chunk => {
-            mergedResults.push({ chunk, score: 1 });
-          });
-        }
-
-        // Append segments as context
-        systemInstruction += `\n\nTrusted Sources Context Excerpts (Use these excerpts to answer specific queries and reference them using Document citation numbers from the active catalog above, e.g. Document [1]):\n`;
-        
-        mergedResults.forEach((res, i) => {
-          const globalDocIdx = trustedSources.findIndex(d => d.id === res.chunk.documentId);
-          const citationIdx = globalDocIdx !== -1 ? globalDocIdx + 1 : 1;
-          
-          systemInstruction += `\nExcerpt [${i + 1}] (From Document [${citationIdx}]: "${res.chunk.documentTitle}" - ID: ${res.chunk.documentId}):\n`;
-          systemInstruction += `${res.chunk.text}\n`;
-
-          // Track which sources are actually present in the prompt context to display in the UI Grounding badges
-          if (!groundedSources.some(s => s.id === res.chunk.documentId)) {
-            groundedSources.push({ id: res.chunk.documentId, title: res.chunk.documentTitle });
+        // 2. Gather all chunks from all trusted sources
+        const allChunks: any[] = [];
+        trustedSources.forEach(doc => {
+          if (doc.chunks && Array.isArray(doc.chunks)) {
+            allChunks.push(...doc.chunks);
           }
         });
-        
-        // 3. Add strict grounding constraints in system instructions to block parametric memory recall
-        systemInstruction += `\n\nCRITICAL GROUNDING CONSTRAINT: 
-Do NOT rely on your pre-training knowledge or parametric memory to answer questions about these documents, authors, or DOIs. You must only answer using the information explicitly provided in the active notebook list and excerpts above. If the context does not contain the answer, state "I cannot find the answer in the uploaded documents."`;
+
+        // Track grounded sources (since semantic search runs on backend, we will conservatively 
+        // mark all trusted sources as grounded for UI tracking, or let backend refine it. 
+        // Here we just mark all docs with chunks as grounded)
+        groundedSources = trustedSources.map(doc => ({ id: doc.id, title: doc.title }));
+
+        // Pass chunks to backend for semantic search & retrieval
+        const hasScannedDoc = trustedSources.some(doc => doc.hasNoText);
+        const aiReply = await executeChatRequest(conversationalHistory, systemInstruction, hasScannedDoc, allChunks);
+
+        // Create assistant reply
+        const assistantMsg: ChatMessage = {
+          id: `msg_${Date.now() + 1}`,
+          sender: 'assistant',
+          content: aiReply,
+          timestamp: Date.now(),
+          sources: groundedSources
+        };
+
+        setMainChatHistory(prev => [...prev, assistantMsg]);
+        await addMessage({
+          ...assistantMsg,
+          workspaceId: WORKSPACE_ID,
+          documentId: null
+        });
       } else {
         systemInstruction += `\nNo documents have been promoted to the trusted notebook yet.`;
+
+        const aiReply = await executeChatRequest(conversationalHistory, systemInstruction, false);
+
+        // Create assistant reply
+        const assistantMsg: ChatMessage = {
+          id: `msg_${Date.now() + 1}`,
+          sender: 'assistant',
+          content: aiReply,
+          timestamp: Date.now(),
+          sources: []
+        };
+
+        setMainChatHistory(prev => [...prev, assistantMsg]);
+        await addMessage({
+          ...assistantMsg,
+          workspaceId: WORKSPACE_ID,
+          documentId: null
+        });
       }
 
-      // Log RAG details for server-side debugging
-      console.log("=================== RAG DEBUGGER ===================");
-      console.log(`Trusted Sources count: ${trustedSources.length}`);
-      trustedSources.forEach((d, idx) => {
-        console.log(`Paper [${idx + 1}]: "${d.title}" | FullText: ${d.fullTextContent ? d.fullTextContent.length : 0} chars | Abstract: ${d.abstract ? d.abstract.length : 0} chars`);
-      });
-      console.log(`Grounded Sources count: ${groundedSources.length}`);
-      groundedSources.forEach((s, idx) => {
-        console.log(`Grounded [${idx + 1}]: "${s.title}" (ID: ${s.id})`);
-      });
-      console.log("====================================================");
-
-      // Query AI provider proxy
-      // Provide conversational history (limit to last 10 messages to save context/tokens)
-      const conversationalHistory = [...mainChatHistory, userMsg].slice(-10);
-      const hasScannedDoc = trustedSources.some(doc => doc.hasNoText);
-      const aiReply = await executeChatRequest(conversationalHistory, systemInstruction, hasScannedDoc);
-
-      // Create assistant reply
-      const assistantMsg: ChatMessage = {
-        id: `msg_${Date.now() + 1}`,
-        sender: 'assistant',
-        content: aiReply,
-        timestamp: Date.now(),
-        sources: groundedSources
-      };
-
-      setMainChatHistory(prev => [...prev, assistantMsg]);
-      await addMessage({
-        ...assistantMsg,
-        workspaceId: WORKSPACE_ID,
-        documentId: null
-      });
+      // RAG debugger logged manually or removed.
 
     } catch (err: any) {
       console.error('Chat error:', err);
@@ -526,45 +512,12 @@ Do NOT rely on your pre-training knowledge or parametric memory to answer questi
     try {
       const fullText = paper.fullTextContent || paper.abstract;
       // We truncate document full text if it's too long, but staged abstract is small.
-      // If we have full text, chunk it or just grab the top TF-IDF match for this specific document.
       let docContext = `Document Title: "${paper.title}"\n`;
       docContext += `Authors: ${paper.authors.join(', ')}\n`;
       
-      if (paper.fullTextContent) {
-        const docChunks = chunkDocument(paper);
-        let selectedChunks: any[] = [];
-        const isSummaryRequest = /summariz|summary|overview|synopsis|what is this.*about|explain/i.test(text);
-        
-        if (isSummaryRequest && docChunks.length > 0) {
-          // Retrieve structural chunks (Introduction: first 2; Conclusion: last 2) + query search
-          const intro = docChunks.slice(0, 2);
-          const conclusion = docChunks.length > 2 ? docChunks.slice(-2) : [];
-          const searchEngine = new TFIDFSearchEngine([paper]);
-          const results = searchEngine.search(text, 2);
-          
-          const seenIds = new Set<string>();
-          [...intro, ...conclusion].forEach(c => {
-            seenIds.add(c.id);
-            selectedChunks.push(c);
-          });
-          
-          results.forEach(res => {
-            if (!seenIds.has(res.chunk.id) && selectedChunks.length < 6) {
-              seenIds.add(res.chunk.id);
-              selectedChunks.push(res.chunk);
-            }
-          });
-        } else {
-          // Run standard TF-IDF search
-          const searchEngine = new TFIDFSearchEngine([paper]);
-          const results = searchEngine.search(text, 5);
-          selectedChunks = results.map(r => r.chunk);
-        }
-        
-        docContext += `\nRelevant text segments from this paper:\n`;
-        selectedChunks.forEach((chunk, i) => {
-          docContext += `Excerpt ${i+1}:\n${chunk.text}\n\n`;
-        });
+      let allChunks: any[] = [];
+      if (paper.fullTextContent && paper.chunks) {
+        allChunks = paper.chunks;
       } else {
         docContext += `\nAbstract:\n${paper.abstract}\n`;
       }
@@ -585,7 +538,7 @@ ${docContext}
       const conversation = [...currentStagedHistory, userMsg].slice(-8);
       const isScanned = !!paper.hasNoText;
 
-      const aiReply = await executeChatRequest(conversation, systemInstruction, isScanned);
+      const aiReply = await executeChatRequest(conversation, systemInstruction, isScanned, allChunks);
 
       const assistantMsg: ChatMessage = {
         id: `msg_${Date.now() + 1}`,

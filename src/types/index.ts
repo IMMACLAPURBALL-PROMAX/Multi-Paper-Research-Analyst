@@ -19,6 +19,7 @@ export interface DocumentSource {
   status: 'staged' | 'promoted';
   addedAt: number;
   hasNoText?: boolean; // True if PDF text layer is empty (scanned PDF)
+  chunks?: any[]; // Stored markdown chunks with their embeddings
 }
 
 export interface ChatMessage {

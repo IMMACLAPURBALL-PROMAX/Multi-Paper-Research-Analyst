@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import CircuitBreaker from 'opossum';
+import { cosineSimilarity } from '@/lib/vector-search';
 
 // 1. Google Gemini API Request Executor
 async function executeGeminiRequest(
@@ -61,7 +62,14 @@ async function executeGeminiRequest(
     body: JSON.stringify(payload)
   });
 
-  const resJson = await response.json();
+  const textBody = await response.text();
+  let resJson;
+  try {
+    resJson = JSON.parse(textBody);
+  } catch (e) {
+    if (!response.ok) throw new Error(`Gemini API returned status ${response.status}: ${textBody}`);
+    resJson = {};
+  }
 
   if (!response.ok) {
     const err = new Error(resJson.error?.message || `Gemini API returned status ${response.status}`);
@@ -136,7 +144,14 @@ async function executeClaudeRequest(
     body: JSON.stringify(payload)
   });
 
-  const resJson = await response.json();
+  const textBody = await response.text();
+  let resJson;
+  try {
+    resJson = JSON.parse(textBody);
+  } catch (e) {
+    if (!response.ok) throw new Error(`Claude API returned status ${response.status}: ${textBody}`);
+    resJson = {};
+  }
 
   if (!response.ok) {
     const err = new Error(resJson.error?.message || `Claude API returned status ${response.status}`);
@@ -218,7 +233,14 @@ async function executeOpenAIRequest(
     body: JSON.stringify(payload)
   });
 
-  const resJson = await response.json();
+  const textBody = await response.text();
+  let resJson;
+  try {
+    resJson = JSON.parse(textBody);
+  } catch (e) {
+    if (!response.ok) throw new Error(`OpenAI/GitHub Models API returned status ${response.status}: ${textBody}`);
+    resJson = {};
+  }
 
   if (!response.ok) {
     const err = new Error(resJson.error?.message || `OpenAI/GitHub Models API returned status ${response.status}`);
@@ -229,28 +251,30 @@ async function executeOpenAIRequest(
   return resJson.choices?.[0]?.message?.content || '';
 }
 
-// Initialize global circuit breakers in Next.js hot-reload safe way
+// Circuit Breaker Registry by User Key
 const globalAny = globalThis as any;
-if (!globalAny.geminiBreaker) {
-  globalAny.geminiBreaker = new CircuitBreaker(executeGeminiRequest, {
-    timeout: 30000,
-    errorThresholdPercentage: 50,
-    resetTimeout: 15000
-  });
+// In dev, clear the registry on hot reload so updated functions are used
+if (process.env.NODE_ENV !== 'production') {
+  globalAny.breakerRegistry = new Map<string, any>();
+} else if (!globalAny.breakerRegistry) {
+  globalAny.breakerRegistry = new Map<string, any>();
 }
-if (!globalAny.claudeBreaker) {
-  globalAny.claudeBreaker = new CircuitBreaker(executeClaudeRequest, {
-    timeout: 30000,
-    errorThresholdPercentage: 50,
-    resetTimeout: 15000
-  });
-}
-if (!globalAny.openaiBreaker) {
-  globalAny.openaiBreaker = new CircuitBreaker(executeOpenAIRequest, {
-    timeout: 30000,
-    errorThresholdPercentage: 50,
-    resetTimeout: 15000
-  });
+
+function getBreaker(provider: string, apiKey: string) {
+  const keyHash = `${provider}_${apiKey.substring(0, 12)}`;
+  if (!globalAny.breakerRegistry.has(keyHash)) {
+    let executor;
+    if (provider === 'gemini') executor = executeGeminiRequest;
+    else if (provider === 'claude') executor = executeClaudeRequest;
+    else executor = executeOpenAIRequest;
+    
+    globalAny.breakerRegistry.set(keyHash, new CircuitBreaker(executor, {
+      timeout: 30000,
+      errorThresholdPercentage: 50,
+      resetTimeout: 15000
+    }));
+  }
+  return globalAny.breakerRegistry.get(keyHash);
 }
 
 // Helper to perform web search using DuckDuckGo HTML
@@ -287,12 +311,23 @@ async function searchWeb(query: string): Promise<string[]> {
   }
 }
 
+// Xenova Embedder Pipeline
+let pipelineInstance: any = null;
+async function getPipeline() {
+  if (!pipelineInstance) {
+    const { pipeline, env } = await import('@xenova/transformers');
+    env.allowLocalModels = false; 
+    pipelineInstance = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { quantized: true });
+  }
+  return pipelineInstance;
+}
+
 // POST endpoint handler
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { messages, systemInstruction, provider, temperature, maxTokens, enableSearch } = body;
-    let { model } = body;
+    const { messages, provider, temperature, maxTokens, enableSearch, chunks } = body;
+    let { model, systemInstruction } = body;
 
     if (model) {
       model = model.replace(/[\u2013\u2014]/g, '-').trim();
@@ -310,14 +345,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing or invalid "messages" in request body.' }, { status: 400 });
     }
 
-    // Log RAG details on the server terminal
-    console.log("=== API CHAT SERVER RAG LOG ===");
-    console.log("Provider:", provider, "| Model:", model);
-    console.log("System Instruction Length:", systemInstruction ? systemInstruction.length : 0);
-    if (systemInstruction) {
-      console.log("System Instruction Preview:\n", systemInstruction.substring(0, 1200));
+    // -------------------------------------------------------------
+    // Semantic Retrieval (Vector Search)
+    // -------------------------------------------------------------
+    if (chunks && Array.isArray(chunks) && chunks.length > 0) {
+      const lastUserMsg = messages.slice().reverse().find((m: any) => m.sender === 'user' || m.role === 'user');
+      if (lastUserMsg && lastUserMsg.content) {
+        console.log(`[Semantic Search] Embedding query: "${lastUserMsg.content}"`);
+        const embedder = await getPipeline();
+        const queryOutput = await embedder(lastUserMsg.content, { pooling: 'mean', normalize: true });
+        const queryVector = Array.from(queryOutput.data) as number[];
+
+        const scoredChunks = chunks
+          .filter((c: any) => c.embedding && Array.isArray(c.embedding))
+          .map((c: any) => ({
+            ...c,
+            score: cosineSimilarity(queryVector, c.embedding)
+          }))
+          .sort((a: any, b: any) => b.score - a.score);
+
+        const topChunks = scoredChunks.slice(0, 3);
+        
+        systemInstruction = (systemInstruction || '') + `\n\nTrusted Sources Context Excerpts (Top 3 Semantic Matches):\n`;
+        topChunks.forEach((c: any, idx: number) => {
+          systemInstruction += `\nExcerpt [${idx + 1}] (From Document: ${c.documentTitle}):\n${c.text}\n`;
+        });
+        
+        systemInstruction += `\n\nCRITICAL GROUNDING CONSTRAINT: You must only answer using the excerpts provided above. If the context does not contain the answer to the user's question, state 'I cannot answer this based on the provided documents.' Do not hallucinate external information.`;
+      }
     }
-    console.log("=================================");
 
     // -------------------------------------------------------------
     // Case A: Load Balancing / Auto Mode
@@ -337,7 +393,7 @@ export async function POST(request: Request) {
           apiKey: geminiKey,
           model: 'gemini-3.5-flash',
           weight: 5,
-          breaker: globalAny.geminiBreaker
+          breaker: getBreaker('gemini', geminiKey)
         });
       }
       if (anthropicKey && anthropicKey.trim() !== '') {
@@ -346,7 +402,7 @@ export async function POST(request: Request) {
           apiKey: anthropicKey,
           model: 'claude-3-5-haiku-latest',
           weight: 2,
-          breaker: globalAny.claudeBreaker
+          breaker: getBreaker('claude', anthropicKey)
         });
       }
       if (openaiKey && openaiKey.trim() !== '') {
@@ -356,7 +412,7 @@ export async function POST(request: Request) {
           apiKey: openaiKey,
           model: isGitHub ? 'gpt-4o-mini' : 'gpt-4o-mini',
           weight: 3,
-          breaker: globalAny.openaiBreaker
+          breaker: getBreaker('openai', openaiKey)
         });
       }
 
@@ -364,33 +420,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'No active/verified API keys provided for Auto load-balancing.' }, { status: 400 });
       }
 
-      // Stateful WRR sequence construction
+      // Randomized WRR selection (Stateless)
       const sequence: number[] = [];
-      const activeWeights = pool.map(p => p.weight);
-      const currentWeights = [...activeWeights];
-      const totalWeight = activeWeights.reduce((sum, w) => sum + w, 0);
-
-      for (let i = 0; i < totalWeight; i++) {
-        let maxIdx = 0;
-        let maxVal = -1;
-        for (let j = 0; j < currentWeights.length; j++) {
-          if (currentWeights[j] > maxVal) {
-            maxVal = currentWeights[j];
-            maxIdx = j;
-          }
-        }
-        sequence.push(maxIdx);
-        currentWeights[maxIdx] -= totalWeight;
-        for (let j = 0; j < currentWeights.length; j++) {
-          currentWeights[j] += activeWeights[j];
-        }
-      }
-
-      if (globalAny.lbCounter === undefined) {
-        globalAny.lbCounter = 0;
-      }
-      const startIndex = globalAny.lbCounter % sequence.length;
-      globalAny.lbCounter++;
+      pool.forEach((p, idx) => {
+        for (let i = 0; i < p.weight; i++) sequence.push(idx);
+      });
+      const startIndex = Math.floor(Math.random() * sequence.length);
 
       let success = false;
       let content = '';
@@ -403,7 +438,7 @@ export async function POST(request: Request) {
         const endpoint = pool[poolIdx];
 
         if (endpoint.breaker.opened) {
-          console.warn(`[Load Balancer] Circuit breaker for ${endpoint.provider} is OPEN. Skipping...`);
+          console.warn(`[Load Balancer] Circuit breaker for ${endpoint.provider} (Key Hash: ${endpoint.apiKey.substring(0,6)}...) is OPEN. Skipping...`);
           continue;
         }
 
@@ -416,10 +451,9 @@ export async function POST(request: Request) {
           } else {
             const lastUserMessage = messages.slice().reverse().find((msg: any) => msg.sender === 'user' || msg.role === 'user')?.content || '';
             if (lastUserMessage) {
-              console.log(`[Search Grounding] Load Balancer fetching web search for: "${lastUserMessage}"`);
               const searchResults = await searchWeb(lastUserMessage);
               if (searchResults.length > 0) {
-                finalInstruction = (systemInstruction || '') + `\n\nWEB SEARCH RESULTS FOR GROUNDING (use these search results to answer the user's query since some documents in their corpus are scanned copies without selectable text layers):\n` +
+                finalInstruction = (systemInstruction || '') + `\n\nWEB SEARCH RESULTS FOR GROUNDING:\n` +
                   searchResults.map((snippet, i) => `Result [${i + 1}]: "${snippet}"`).join('\n') + `\n\n`;
               }
             }
@@ -459,62 +493,45 @@ export async function POST(request: Request) {
     // -------------------------------------------------------------
     // Case B: Direct Model Target Mode
     // -------------------------------------------------------------
-    if (!model) {
-      return NextResponse.json({ error: 'Missing "model" in request body.' }, { status: 400 });
-    }
-
     let enrichedSystemInstruction = systemInstruction || '';
     if (enableSearch && provider !== 'gemini') {
       const lastUserMessage = messages.slice().reverse().find((msg: any) => msg.sender === 'user' || msg.role === 'user')?.content || '';
       if (lastUserMessage) {
-        console.log(`[Search Grounding] Direct routing fetching web search for: "${lastUserMessage}"`);
         const searchResults = await searchWeb(lastUserMessage);
         if (searchResults.length > 0) {
-          enrichedSystemInstruction += `\n\nWEB SEARCH RESULTS FOR GROUNDING (use these search results to answer the user's query since some documents in their corpus are scanned copies without selectable text layers):\n` +
+          enrichedSystemInstruction += `\n\nWEB SEARCH RESULTS FOR GROUNDING:\n` +
             searchResults.map((snippet, i) => `Result [${i + 1}]: "${snippet}"`).join('\n') + `\n\n`;
         }
       }
     }
 
     if (provider === 'gemini') {
-      if (!geminiKey) {
-        return NextResponse.json({ error: 'Gemini API Key is missing. Please configure it in Settings.' }, { status: 400 });
-      }
+      if (!geminiKey) return NextResponse.json({ error: 'Gemini API Key is missing.' }, { status: 400 });
       try {
-        const text = await globalAny.geminiBreaker.fire(geminiKey, model, messages, systemInstruction, temperature, maxTokens, enableSearch);
+        const text = await getBreaker('gemini', geminiKey).fire(geminiKey, model, messages, enrichedSystemInstruction, temperature, maxTokens, enableSearch);
         return NextResponse.json({ content: text });
       } catch (err: any) {
-        return NextResponse.json({ 
-          error: err.message === 'open' ? 'Gemini service is temporarily disabled (Circuit Breaker OPEN).' : (err.message || 'Gemini error')
-        }, { status: err.status || 500 });
+        return NextResponse.json({ error: err.message === 'open' ? 'Gemini service is disabled (Circuit Breaker OPEN).' : (err.message || 'Gemini error') }, { status: err.status || 500 });
       }
     } 
     
     if (provider === 'claude') {
-      if (!anthropicKey) {
-        return NextResponse.json({ error: 'Claude API Key is missing. Please configure it in Settings.' }, { status: 400 });
-      }
+      if (!anthropicKey) return NextResponse.json({ error: 'Claude API Key is missing.' }, { status: 400 });
       try {
-        const text = await globalAny.claudeBreaker.fire(anthropicKey, model, messages, enrichedSystemInstruction, temperature, maxTokens);
+        const text = await getBreaker('claude', anthropicKey).fire(anthropicKey, model, messages, enrichedSystemInstruction, temperature, maxTokens);
         return NextResponse.json({ content: text });
       } catch (err: any) {
-        return NextResponse.json({ 
-          error: err.message === 'open' ? 'Claude service is temporarily disabled (Circuit Breaker OPEN).' : (err.message || 'Claude error')
-        }, { status: err.status || 500 });
+        return NextResponse.json({ error: err.message === 'open' ? 'Claude service is disabled (Circuit Breaker OPEN).' : (err.message || 'Claude error') }, { status: err.status || 500 });
       }
     } 
     
     if (provider === 'openai') {
-      if (!openaiKey) {
-        return NextResponse.json({ error: 'OpenAI/GitHub Key is missing. Please configure it in Settings.' }, { status: 400 });
-      }
+      if (!openaiKey) return NextResponse.json({ error: 'OpenAI/GitHub Key is missing.' }, { status: 400 });
       try {
-        const text = await globalAny.openaiBreaker.fire(openaiKey, model, messages, enrichedSystemInstruction, temperature, maxTokens);
+        const text = await getBreaker('openai', openaiKey).fire(openaiKey, model, messages, enrichedSystemInstruction, temperature, maxTokens);
         return NextResponse.json({ content: text });
       } catch (err: any) {
-        return NextResponse.json({ 
-          error: err.message === 'open' ? 'OpenAI/GitHub service is temporarily disabled (Circuit Breaker OPEN).' : (err.message || 'OpenAI/GitHub error')
-        }, { status: err.status || 500 });
+        return NextResponse.json({ error: err.message === 'open' ? 'OpenAI/GitHub service disabled (Circuit Breaker OPEN).' : (err.message || 'OpenAI/GitHub error') }, { status: err.status || 500 });
       }
     }
 
