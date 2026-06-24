@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "postinstall": "rimraf node_modules/onnxruntime-node"
+    "lint": "eslint"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
