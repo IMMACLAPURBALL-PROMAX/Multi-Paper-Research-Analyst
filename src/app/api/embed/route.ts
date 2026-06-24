@@ -7,7 +7,10 @@ async function getPipeline() {
     const { pipeline, env } = await import('@xenova/transformers');
     
     // Disable local model loading to fetch directly from HF Hub (safe for serverless)
-    env.allowLocalModels = false; 
+    env.allowLocalModels = false;
+    
+    // Force the AI model to cache inside Vercel's writable temporary directory
+    env.cacheDir = "/tmp/.cache";
     
     pipelineInstance = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', {
       quantized: true,
