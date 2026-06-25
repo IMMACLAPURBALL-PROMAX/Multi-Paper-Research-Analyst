@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import CircuitBreaker from 'opossum';
 import { cosineSimilarity } from '@/lib/vector-search';
+import { generateEmbeddings } from '@/lib/embeddings';
 
 // 1. Google Gemini API Request Executor
 async function executeGeminiRequest(
@@ -343,27 +344,18 @@ export async function POST(request: Request) {
       const lastUserMsg = messages.slice().reverse().find((m: any) => m.sender === 'user' || m.role === 'user');
       if (lastUserMsg && lastUserMsg.content) {
         console.log(`[Semantic Search] Embedding query: "${lastUserMsg.content}"`);
-        const protocol = request.headers.get('x-forwarded-proto') || 'http';
-        const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000';
-        const embedRes = await fetch(`${protocol}://${host}/api/embed`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-gemini-key': request.headers.get('x-gemini-key') || '',
-            'x-openai-key': request.headers.get('x-openai-key') || ''
-          },
-          body: JSON.stringify({ 
-            texts: [lastUserMsg.content],
-            provider: provider 
-          })
-        });
         
-        if (!embedRes.ok) {
-          throw new Error('Failed to generate query embedding via decoupled /api/embed route');
-        }
+        const geminiKey = request.headers.get('x-gemini-key');
+        const openaiKey = request.headers.get('x-openai-key');
         
-        const embedData = await embedRes.json();
-        const queryVector = embedData.embeddings[0];
+        const queryEmbeddings = await generateEmbeddings(
+          [lastUserMsg.content],
+          provider,
+          geminiKey,
+          openaiKey
+        );
+        
+        const queryVector = queryEmbeddings[0];
 
         const scoredChunks = chunks
           .filter((c: any) => c.embedding && Array.isArray(c.embedding))
