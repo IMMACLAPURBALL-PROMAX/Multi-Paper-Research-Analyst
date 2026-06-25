@@ -347,8 +347,15 @@ export async function POST(request: Request) {
         const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000';
         const embedRes = await fetch(`${protocol}://${host}/api/embed`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ texts: [lastUserMsg.content] })
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-gemini-key': request.headers.get('x-gemini-key') || '',
+            'x-openai-key': request.headers.get('x-openai-key') || ''
+          },
+          body: JSON.stringify({ 
+            texts: [lastUserMsg.content],
+            provider: provider 
+          })
         });
         
         if (!embedRes.ok) {

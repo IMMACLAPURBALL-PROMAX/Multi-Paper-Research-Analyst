@@ -211,8 +211,15 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (chunks.length > 0) {
         const embedRes = await fetch('/api/embed', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ texts: chunks.map(c => c.text) })
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-gemini-key': apiKeys.gemini || '',
+            'x-openai-key': apiKeys.openai || ''
+          },
+          body: JSON.stringify({ 
+            texts: chunks.map(c => c.text),
+            provider: modelConfig.provider
+          })
         });
         
         if (embedRes.ok) {
