@@ -220,9 +220,21 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       });
 
       if (!ingestRes.ok) {
-         const errBody = await ingestRes.text();
-         console.error("Ingestion failed:", errBody);
-         throw new Error("Failed to process document into vector database.");
+         let errMsg = "Failed to process document into vector database.";
+         try {
+           const errBody = await ingestRes.json();
+           if (errBody.error) {
+             if (errBody.error.includes("429") || errBody.error.includes("quota")) {
+               errMsg = "Rate limit exceeded! The AI provider's quota was reached. Please wait a moment and try reuploading the PDF.";
+             } else {
+               errMsg = errBody.error;
+             }
+           }
+         } catch(e) {
+           // fallback if not json
+         }
+         console.error("Ingestion failed:", errMsg);
+         throw new Error(errMsg);
       }
       
       setUploadProgress({ processed: 100, total: 100 });
