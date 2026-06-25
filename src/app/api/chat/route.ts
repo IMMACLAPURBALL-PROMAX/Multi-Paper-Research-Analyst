@@ -311,18 +311,7 @@ async function searchWeb(query: string): Promise<string[]> {
   }
 }
 
-// Xenova Embedder Pipeline
-let pipelineInstance: any = null;
-async function getPipeline() {
-  if (!pipelineInstance) {
-    const { pipeline, env } = await import('@huggingface/transformers');
-    env.allowLocalModels = false; 
-    env.cacheDir = "/tmp/.cache";
-    (env.backends as any).setPriority(['wasm', 'cpu']);
-    pipelineInstance = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { dtype: 'q8' });
-  }
-  return pipelineInstance;
-}
+// Removed getPipeline() because we now decouple embedding logic to the Edge-based /api/embed endpoint
 
 // POST endpoint handler
 export async function POST(request: Request) {
@@ -354,9 +343,20 @@ export async function POST(request: Request) {
       const lastUserMsg = messages.slice().reverse().find((m: any) => m.sender === 'user' || m.role === 'user');
       if (lastUserMsg && lastUserMsg.content) {
         console.log(`[Semantic Search] Embedding query: "${lastUserMsg.content}"`);
-        const embedder = await getPipeline();
-        const queryOutput = await embedder(lastUserMsg.content, { pooling: 'mean', normalize: true });
-        const queryVector = Array.from(queryOutput.data) as number[];
+        const protocol = request.headers.get('x-forwarded-proto') || 'http';
+        const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000';
+        const embedRes = await fetch(`${protocol}://${host}/api/embed`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ texts: [lastUserMsg.content] })
+        });
+        
+        if (!embedRes.ok) {
+          throw new Error('Failed to generate query embedding via decoupled /api/embed route');
+        }
+        
+        const embedData = await embedRes.json();
+        const queryVector = embedData.embeddings[0];
 
         const scoredChunks = chunks
           .filter((c: any) => c.embedding && Array.isArray(c.embedding))
