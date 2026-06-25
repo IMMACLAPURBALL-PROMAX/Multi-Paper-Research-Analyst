@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import CircuitBreaker from 'opossum';
 import { cosineSimilarity } from '@/lib/vector-search';
 import { generateEmbeddings } from '@/lib/embeddings';
+import { supabase } from '@/lib/supabase';
 
 // 1. Google Gemini API Request Executor
 async function executeGeminiRequest(
@@ -318,7 +319,7 @@ async function searchWeb(query: string): Promise<string[]> {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { messages, provider, temperature, maxTokens, enableSearch, chunks } = body;
+    const { messages, provider, temperature, maxTokens, enableSearch, documentIds } = body;
     let { model, systemInstruction } = body;
 
     if (model) {
@@ -338,9 +339,9 @@ export async function POST(request: Request) {
     }
 
     // -------------------------------------------------------------
-    // Semantic Retrieval (Vector Search)
+    // Semantic Retrieval (Hybrid Search via Supabase)
     // -------------------------------------------------------------
-    if (chunks && Array.isArray(chunks) && chunks.length > 0) {
+    if (documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
       const lastUserMsg = messages.slice().reverse().find((m: any) => m.sender === 'user' || m.role === 'user');
       if (lastUserMsg && lastUserMsg.content) {
         console.log(`[Semantic Search] Embedding query: "${lastUserMsg.content}"`);
@@ -357,22 +358,24 @@ export async function POST(request: Request) {
         
         const queryVector = queryEmbeddings[0];
 
-        const scoredChunks = chunks
-          .filter((c: any) => c.embedding && Array.isArray(c.embedding))
-          .map((c: any) => ({
-            ...c,
-            score: cosineSimilarity(queryVector, c.embedding)
-          }))
-          .sort((a: any, b: any) => b.score - a.score);
+        // Fetch top 5 chunks using Hybrid Search RPC (RRF combining Full Text & Vector)
+        // We filter by document_id to ensure we only search trusted/staged sources
+        const { data: topChunks, error } = await supabase.rpc('hybrid_search', {
+          query_text: lastUserMsg.content,
+          query_embedding: queryVector,
+          match_count: 5
+        }).in('document_id', documentIds);
 
-        const topChunks = scoredChunks.slice(0, 3);
-        
-        systemInstruction = (systemInstruction || '') + `\n\nTrusted Sources Context Excerpts (Top 3 Semantic Matches):\n`;
-        topChunks.forEach((c: any, idx: number) => {
-          systemInstruction += `\nExcerpt [${idx + 1}] (From Document: ${c.documentTitle}):\n${c.text}\n`;
-        });
-        
-        systemInstruction += `\n\nCRITICAL GROUNDING CONSTRAINT: You must only answer using the excerpts provided above. If the context does not contain the answer to the user's question, state 'I cannot answer this based on the provided documents.' Do not hallucinate external information.`;
+        if (error) {
+          console.error("Supabase hybrid search failed:", error);
+        } else if (topChunks && topChunks.length > 0) {
+          systemInstruction = (systemInstruction || '') + `\n\nTrusted Sources Context Excerpts (Top 5 Hybrid Matches):\n`;
+          topChunks.forEach((c: any, idx: number) => {
+            systemInstruction += `\nExcerpt [${idx + 1}]:\n${c.content}\n`;
+          });
+          
+          systemInstruction += `\n\nCRITICAL GROUNDING CONSTRAINT: You must only answer using the excerpts provided above. If the context does not contain the answer to the user's question, state 'I cannot answer this based on the provided documents.' Do not hallucinate external information.`;
+        }
       }
     }
 

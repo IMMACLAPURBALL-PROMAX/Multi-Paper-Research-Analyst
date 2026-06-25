@@ -204,30 +204,25 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const paperId = `upload_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       const title = file.name.replace(/\.[^/.]+$/, "");
 
-      // 2. Chunk Markdown
-      let chunks = chunkMarkdown(paperId, title, markdown);
-      
-      // 3. Embed Chunks
-      if (chunks.length > 0) {
-        const embedRes = await fetch('/api/embed', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-gemini-key': apiKeys.gemini || '',
-            'x-openai-key': apiKeys.openai || ''
-          },
-          body: JSON.stringify({ 
-            texts: chunks.map(c => c.text),
-            provider: modelConfig.provider
-          })
-        });
-        
-        if (embedRes.ok) {
-          const { embeddings } = await embedRes.json();
-          chunks = chunks.map((c, i) => ({ ...c, embedding: embeddings[i] }));
-        } else {
-          console.error("Failed to generate embeddings, chunks will lack vectors.");
-        }
+      // 2. Ingest Markdown to Supabase
+      const ingestRes = await fetch('/api/ingest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          documentId: paperId,
+          markdown,
+          provider: modelConfig.provider,
+          geminiKey: apiKeys.gemini || '',
+          openaiKey: apiKeys.openai || ''
+        })
+      });
+
+      if (!ingestRes.ok) {
+         const errBody = await ingestRes.text();
+         console.error("Ingestion failed:", errBody);
+         throw new Error("Failed to process document into vector database.");
       }
       
       setUploadProgress({ processed: 100, total: 100 });
@@ -240,7 +235,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         authors,
         abstract: `Uploaded PDF file: ${file.name}. Size: ${(file.size / 1024 / 1024).toFixed(2)} MB.`,
         fullTextContent: markdown,
-        chunks, // Save semantic chunks and embeddings
+        chunks: [], // We no longer store chunks locally, they live in Supabase
         metadata: {
           url: '',
           pdfUrl: '',
@@ -342,7 +337,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   // Helper to fetch chat completion
-  const executeChatRequest = async (messages: ChatMessage[], systemInstruction?: string, enableSearch = false, chunks: any[] = []) => {
+  const executeChatRequest = async (messages: ChatMessage[], systemInstruction?: string, enableSearch = false, documentIds: string[] = []) => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -361,7 +356,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         temperature: modelConfig.temperature,
         maxTokens: modelConfig.maxTokens,
         enableSearch,
-        chunks
+        documentIds
       })
     });
 
@@ -420,22 +415,15 @@ CRITICAL INSTRUCTIONS:
           systemInstruction += `Abstract: ${doc.abstract || 'No abstract available.'}\n`;
         });
 
-        // 2. Gather all chunks from all trusted sources
-        const allChunks: any[] = [];
-        trustedSources.forEach(doc => {
-          if (doc.chunks && Array.isArray(doc.chunks)) {
-            allChunks.push(...doc.chunks);
-          }
-        });
+        // 2. Identify the document IDs to search over
+        const trustedIds = trustedSources.map(doc => doc.id);
 
-        // Track grounded sources (since semantic search runs on backend, we will conservatively 
-        // mark all trusted sources as grounded for UI tracking, or let backend refine it. 
-        // Here we just mark all docs with chunks as grounded)
+        // Track grounded sources
         groundedSources = trustedSources.map(doc => ({ id: doc.id, title: doc.title }));
 
-        // Pass chunks to backend for semantic search & retrieval
+        // Pass document IDs to backend for semantic search & retrieval
         const hasScannedDoc = trustedSources.some(doc => doc.hasNoText);
-        const aiReply = await executeChatRequest(conversationalHistory, systemInstruction, hasScannedDoc, allChunks);
+        const aiReply = await executeChatRequest(conversationalHistory, systemInstruction, hasScannedDoc, trustedIds);
 
         // Create assistant reply
         const assistantMsg: ChatMessage = {
@@ -522,13 +510,6 @@ CRITICAL INSTRUCTIONS:
       let docContext = `Document Title: "${paper.title}"\n`;
       docContext += `Authors: ${paper.authors.join(', ')}\n`;
       
-      let allChunks: any[] = [];
-      if (paper.fullTextContent && paper.chunks) {
-        allChunks = paper.chunks;
-      } else {
-        docContext += `\nAbstract:\n${paper.abstract}\n`;
-      }
-
       const isPromoted = paper.status === 'promoted';
       const systemInstruction = `You are a research analyst reviewing a ${isPromoted ? 'promoted notebook' : 'staged (unverified)'} paper.
 Your goal is to answer questions ONLY about this specific paper: "${paper.title}".
@@ -545,7 +526,7 @@ ${docContext}
       const conversation = [...currentStagedHistory, userMsg].slice(-8);
       const isScanned = !!paper.hasNoText;
 
-      const aiReply = await executeChatRequest(conversation, systemInstruction, isScanned, allChunks);
+      const aiReply = await executeChatRequest(conversation, systemInstruction, isScanned, [paper.id]);
 
       const assistantMsg: ChatMessage = {
         id: `msg_${Date.now() + 1}`,
