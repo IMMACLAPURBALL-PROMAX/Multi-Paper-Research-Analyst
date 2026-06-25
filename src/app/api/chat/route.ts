@@ -430,15 +430,15 @@ export async function POST(request: Request) {
         for (let i = 0; i < p.weight; i++) sequence.push(idx);
       });
       const startIndex = Math.floor(Math.random() * sequence.length);
+      const initialPoolIdx = sequence[startIndex];
 
       let success = false;
       let content = '';
       let lastError = null;
 
-      // Failover round robin attempts
+      // Failover round robin attempts across distinct providers
       for (let attempt = 0; attempt < pool.length; attempt++) {
-        const seqIdx = (startIndex + attempt) % sequence.length;
-        const poolIdx = sequence[seqIdx];
+        const poolIdx = (initialPoolIdx + attempt) % pool.length;
         const endpoint = pool[poolIdx];
 
         if (endpoint.breaker.opened) {
