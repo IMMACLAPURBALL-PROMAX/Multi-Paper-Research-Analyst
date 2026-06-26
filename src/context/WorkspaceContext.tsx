@@ -415,8 +415,7 @@ CRITICAL INSTRUCTIONS:
 `;
 
       let groundedSources: Array<{ id: string; title: string }> = [];
-      const conversationalHistory = [...mainChatHistory, userMsg].slice(-10);
-
+      
       if (trustedSources.length > 0) {
         // 1. Inject a global catalog of active notebook documents with their abstracts
         systemInstruction += `\n\nActive Notebook Documents (Total: ${trustedSources.length}):\n`;
@@ -429,13 +428,24 @@ CRITICAL INSTRUCTIONS:
 
         // 2. Identify the document IDs to search over
         const trustedIds = trustedSources.map(doc => doc.id);
+        const activeIdsSet = new Set(trustedIds);
+
+        // Smart Pruning & Token Reduction: Keep max 6 messages, filter out deleted paper citations
+        const conversationalHistory = [...mainChatHistory, userMsg].slice(-6);
+        const prunedHistory = conversationalHistory.filter(msg => {
+          if (msg.sender === 'user') return true;
+          if (msg.sources && msg.sources.length > 0) {
+             return msg.sources.every(source => activeIdsSet.has(source.id));
+          }
+          return true;
+        });
 
         // Track grounded sources
         groundedSources = trustedSources.map(doc => ({ id: doc.id, title: doc.title }));
 
         // Pass document IDs to backend for semantic search & retrieval
         const hasScannedDoc = trustedSources.some(doc => doc.hasNoText);
-        const aiReply = await executeChatRequest(conversationalHistory, systemInstruction, hasScannedDoc, trustedIds);
+        const aiReply = await executeChatRequest(prunedHistory, systemInstruction, hasScannedDoc, trustedIds);
 
         // Create assistant reply
         const assistantMsg: ChatMessage = {
@@ -535,7 +545,7 @@ ${docContext}
 `;
 
       const currentStagedHistory = stagedChats[paperId] || [];
-      const conversation = [...currentStagedHistory, userMsg].slice(-8);
+      const conversation = [...currentStagedHistory, userMsg].slice(-4);
       const isScanned = !!paper.hasNoText;
 
       const aiReply = await executeChatRequest(conversation, systemInstruction, isScanned, [paper.id]);

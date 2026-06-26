@@ -374,7 +374,7 @@ export async function POST(request: Request) {
             systemInstruction += `\nExcerpt [${idx + 1}]:\n${c.content}\n`;
           });
           
-          systemInstruction += `\n\nCRITICAL GROUNDING CONSTRAINT: You must only answer using the excerpts provided above. If the context does not contain the answer to the user's question, state 'I cannot answer this based on the provided documents.' Do not hallucinate external information.`;
+          systemInstruction += `\n\nCRITICAL GROUNDING CONSTRAINT: You must ONLY answer using the Trusted Sources Context Excerpts AND the Active Notebook Documents catalog provided above. If the combined context does not contain the answer to the user's question, state 'I cannot answer this based on the provided documents.' Do not hallucinate external information.`;
         }
       }
     }
@@ -395,7 +395,7 @@ export async function POST(request: Request) {
         pool.push({
           provider: 'gemini',
           apiKey: geminiKey,
-          model: 'gemini-3.5-flash',
+          model: 'gemini-3.1-flash-lite',
           weight: 5,
           breaker: getBreaker('gemini', geminiKey)
         });
