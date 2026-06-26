@@ -48,10 +48,10 @@ interface WorkspaceContextProps {
 const WorkspaceContext = createContext<WorkspaceContextProps | undefined>(undefined);
 
 const defaultModelConfig: ModelConfig = {
-  provider: 'gemini',
-  model: 'gemini-3.5-flash',
+  provider: 'auto',
+  model: 'auto',
   temperature: 0.2,
-  maxTokens: 2048,
+  maxTokens: 1024,
 };
 
 const WORKSPACE_ID = 'default-workspace'; // Supporting single workspace for simplicity
