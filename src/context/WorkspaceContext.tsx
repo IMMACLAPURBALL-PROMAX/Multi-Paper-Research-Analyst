@@ -44,6 +44,8 @@ interface WorkspaceContextProps {
   setActiveCenterTab: (tab: 'chat' | 'canvas' | 'viewer') => void;
   selectedViewerDocId: string | null;
   setSelectedViewerDocId: (id: string | null) => void;
+  isInlineViewerOpen: boolean;
+  setIsInlineViewerOpen: (open: boolean) => void;
   activeTheme: 'purple' | 'coral' | 'amber' | 'teal' | 'plains';
   updateTheme: (theme: 'purple' | 'coral' | 'amber' | 'teal' | 'plains') => void;
 }
@@ -79,6 +81,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [chatError, setChatError] = useState<string | null>(null);
   const [activeCenterTab, setActiveCenterTab] = useState<'chat' | 'canvas' | 'viewer'>('chat');
   const [selectedViewerDocId, setSelectedViewerDocId] = useState<string | null>(null);
+  const [isInlineViewerOpen, setIsInlineViewerOpen] = useState<boolean>(false);
   const [activeTheme, setActiveTheme] = useState<'purple' | 'coral' | 'amber' | 'teal' | 'plains'>('purple');
 
   // Load cached theme from localStorage on mount
@@ -631,6 +634,8 @@ ${docContext}
       setActiveCenterTab,
       selectedViewerDocId,
       setSelectedViewerDocId,
+      isInlineViewerOpen,
+      setIsInlineViewerOpen,
       activeTheme,
       updateTheme
     }}>

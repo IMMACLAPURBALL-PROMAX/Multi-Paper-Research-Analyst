@@ -2,9 +2,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspace } from '@/context/WorkspaceContext';
-import { Send, Sparkles, Trash2, ShieldAlert, Cpu, Layers, Paperclip, X, Image as ImageIcon, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Send, Sparkles, Trash2, ShieldAlert, Cpu, Layers, Paperclip, X, Image as ImageIcon, ZoomIn, ZoomOut, Maximize2, PanelLeft } from 'lucide-react';
 import { renderMarkdown } from '@/lib/markdown';
 import { getAvailableModels } from '@/lib/models';
+import { InlinePdfViewer } from '@/components/documents/InlinePdfViewer';
 
 export const MainChat: React.FC = () => {
   const { 
@@ -18,7 +19,9 @@ export const MainChat: React.FC = () => {
     modelConfig,
     updateModelConfig,
     activeCenterTab,
-    setActiveCenterTab
+    setActiveCenterTab,
+    isInlineViewerOpen,
+    setIsInlineViewerOpen
   } = useWorkspace();
 
   const availableModels = getAvailableModels(apiKeys);
@@ -156,6 +159,30 @@ export const MainChat: React.FC = () => {
             )}
           </div>
 
+          {/* Toggle PDF Viewer Button */}
+          <button
+            className={`btn-toggle-pdf ${isInlineViewerOpen ? 'active' : ''}`}
+            onClick={() => setIsInlineViewerOpen(!isInlineViewerOpen)}
+            title="Toggle Split-Screen PDF Viewer"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 10px',
+              background: isInlineViewerOpen ? 'var(--color-brand-glow)' : 'transparent',
+              border: isInlineViewerOpen ? '1px solid var(--border-color-glow)' : '1px solid transparent',
+              borderRadius: 'var(--radius-sm)',
+              color: isInlineViewerOpen ? '#fff' : 'var(--text-secondary)',
+              fontSize: '11px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            <PanelLeft size={14} />
+            <span>PDF</span>
+          </button>
+
           {/* Token count indicator */}
           <div className="token-counter" title="Estimated tokens loaded in memory">
             <Layers size={12} className="token-icon" />
@@ -173,6 +200,29 @@ export const MainChat: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Sliding Body Container */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        
+        {/* Left Side: Sliding PDF Viewer */}
+        <div style={{ 
+          width: isInlineViewerOpen ? '50%' : '0%', 
+          opacity: isInlineViewerOpen ? 1 : 0,
+          overflow: 'hidden',
+          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+          borderRight: isInlineViewerOpen ? '1px solid var(--border-color)' : 'none'
+        }}>
+          {isInlineViewerOpen && <InlinePdfViewer />}
+        </div>
+        
+        {/* Right Side: Chat UI */}
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column', 
+          overflow: 'hidden',
+          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}>
 
       {/* 2. Message History Area */}
       <div className="messages-area">
@@ -334,6 +384,9 @@ export const MainChat: React.FC = () => {
           <span>Only trusted sources are used for generating answers.</span>
         </div>
       </div>
+
+        </div> {/* End Chat UI Wrapper */}
+      </div> {/* End Split Container */}
 
       {/* Lightbox Overlay */}
       {activeLightboxImage && (
