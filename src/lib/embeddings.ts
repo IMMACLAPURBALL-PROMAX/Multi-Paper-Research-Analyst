@@ -79,7 +79,8 @@ export async function generateEmbeddings(
     for (const batch of batches) {
       const payload = {
         input: batch,
-        model: "text-embedding-3-small"
+        model: "text-embedding-3-small",
+        dimensions: 768
       };
       
       const response = await fetch(url, {

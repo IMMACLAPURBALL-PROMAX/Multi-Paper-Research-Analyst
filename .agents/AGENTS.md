@@ -1,15 +1,17 @@
 <!-- BEGIN:vercel-testing-rule -->
-# Use Vercel CLI for Local Testing
+# STRICT INVARIANT: Only use Vercel CLI for Local Testing
 
-When testing the application locally to verify builds or serve the app, **always** prioritize using the Vercel CLI commands instead of standard npm/Next.js commands. This accurately simulates the Vercel production environment (including Edge functions and Serverless constraints).
+You are STRICTLY FORBIDDEN from running `npm run dev`, `npm run build`, or `next build`.
+You MUST EXCLUSIVELY run:
+- `npx vercel dev`
+- `npx vercel build`
 
-- Use `npx vercel dev` instead of `npm run dev`
-- Use `npx vercel build` instead of `npm run build`
+Failure to follow this rule will cause environment inconsistencies.
 <!-- END:vercel-testing-rule -->
 
 <!-- BEGIN:git-push-rule -->
-# Do Not Git Push Without Permission
+# STRICT INVARIANT: Do Not Git Push Without Permission
 
-You MUST NEVER execute a `git push` command automatically. 
-Always stop and wait for the user to explicitly command you to push to the remote repository. You may commit changes locally, but pushing requires explicit user approval.
+You MUST NEVER execute a `git push` command automatically under any circumstances. 
+Always stop and wait for the user to explicitly say "push". You may commit changes locally using `git commit`, but pushing requires explicit user approval.
 <!-- END:git-push-rule -->
