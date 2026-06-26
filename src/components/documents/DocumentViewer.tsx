@@ -10,7 +10,7 @@ interface Chunk {
 }
 
 export const DocumentViewer: React.FC = () => {
-  const { trustedSources, selectedViewerDocId, setSelectedViewerDocId } = useWorkspace();
+  const { trustedSources, selectedViewerDocId, setSelectedViewerDocId, activeCenterTab, setActiveCenterTab } = useWorkspace();
   const [chunks, setChunks] = useState<Chunk[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,28 +68,39 @@ export const DocumentViewer: React.FC = () => {
     fetchPdf();
   }, [selectedViewerDocId]);
 
-  if (trustedSources.length === 0) {
-    return (
-      <div style={{ padding: '20px', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '100px' }}>
-        No documents uploaded. Upload a PDF to view its contents.
-      </div>
-    );
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Header Row (reused classes from chat header for consistency) */}
       <div className="chat-header border-bottom">
         <div className="header-tabs-container">
           <div className="header-tabs">
-            <span className="header-tab-desc" style={{ fontWeight: 600, color: 'var(--color-brand)' }}>Split-Screen Document Viewer</span>
+            <button 
+              className={`header-tab-btn ${activeCenterTab === 'chat' ? 'active' : ''}`}
+              onClick={() => setActiveCenterTab('chat')}
+            >
+              Analyst Chat
+            </button>
+            <button 
+              className={`header-tab-btn ${activeCenterTab === 'canvas' ? 'active' : ''}`}
+              onClick={() => setActiveCenterTab('canvas')}
+            >
+              Concept Canvas
+            </button>
+            <button 
+              className={`header-tab-btn ${activeCenterTab === 'viewer' ? 'active' : ''}`}
+              onClick={() => setActiveCenterTab('viewer')}
+            >
+              Document Viewer
+            </button>
           </div>
+          <span className="header-tab-desc" style={{ fontWeight: 600, color: 'var(--color-brand)' }}>Split-Screen Document Viewer</span>
         </div>
         
         <div className="header-actions" style={{ flex: 1, justifyContent: 'flex-end', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <select 
             value={selectedViewerDocId || ''} 
             onChange={(e) => setSelectedViewerDocId(e.target.value)}
+            disabled={trustedSources.length === 0}
             style={{
               padding: '6px 12px',
               borderRadius: 'var(--radius-sm)',
@@ -100,9 +111,11 @@ export const DocumentViewer: React.FC = () => {
               maxWidth: '300px'
             }}
           >
-            {trustedSources.map(doc => (
+            {trustedSources.length > 0 ? trustedSources.map(doc => (
               <option key={doc.id} value={doc.id}>{doc.title}</option>
-            ))}
+            )) : (
+              <option value="">No documents</option>
+            )}
           </select>
           <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
             {chunks.length} chunks
@@ -111,7 +124,12 @@ export const DocumentViewer: React.FC = () => {
       </div>
 
       {/* Split Body */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      {trustedSources.length === 0 ? (
+        <div style={{ padding: '20px', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '100px' }}>
+          No documents uploaded. Upload a PDF to view its contents.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         
         {/* Left Side: Visual PDF */}
         <div style={{ flex: 1, borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', background: '#e2e8f0' }}>
@@ -166,7 +184,7 @@ export const DocumentViewer: React.FC = () => {
             </div>
           ))}
         </div>
-      </div>
+      )}
     </div>
   );
 };
