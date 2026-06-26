@@ -192,12 +192,18 @@ mindmap
             >
               Concept Canvas
             </button>
+            <button 
+              className={`header-tab-btn ${activeCenterTab === 'viewer' ? 'active' : ''}`}
+              onClick={() => setActiveCenterTab('viewer')}
+            >
+              Document Viewer
+            </button>
           </div>
-          {activeCenterTab === 'chat' ? (
-            <span className="header-tab-desc">Grounded in notebook</span>
-          ) : (
-            <span className="header-tab-desc">Visual concept map</span>
-          )}
+          <span className="header-tab-desc">
+            {activeCenterTab === 'chat' && 'Grounded in notebook'}
+            {activeCenterTab === 'canvas' && 'Visual concept map'}
+            {activeCenterTab === 'viewer' && 'Split-screen PDF & chunks'}
+          </span>
         </div>
         
         {trustedSources.length > 0 && hasKeys && (

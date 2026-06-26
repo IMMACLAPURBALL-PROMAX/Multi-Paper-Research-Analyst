@@ -7,6 +7,7 @@ import { ResearchPanel } from '@/components/documents/ResearchPanel';
 import { PreviewDrawer } from '@/components/documents/PreviewDrawer';
 import { MainChat } from '@/components/chat/MainChat';
 import { MindMapCanvas } from '@/components/visualization/MindMapCanvas';
+import { DocumentViewer } from '@/components/documents/DocumentViewer';
 import { KeyConfigModal } from '@/components/layout/KeyConfigModal';
 import { BookOpen, Sparkles } from 'lucide-react';
 
@@ -53,9 +54,11 @@ const InnerWorkspace: React.FC<{
         <PreviewDrawer />
       </div>
 
-      {/* Center Column - Grounded Chat or Concept Canvas */}
+      {/* Center Column - Grounded Chat, Concept Canvas, or Document Viewer */}
       <div className="workspace-column center-col">
-        {activeCenterTab === 'chat' ? <MainChat /> : <MindMapCanvas />}
+        {activeCenterTab === 'chat' && <MainChat />}
+        {activeCenterTab === 'canvas' && <MindMapCanvas />}
+        {activeCenterTab === 'viewer' && <DocumentViewer />}
       </div>
 
       {/* Settings Modal */}

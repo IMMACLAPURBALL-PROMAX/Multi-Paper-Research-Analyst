@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { DocumentSource, ChatMessage, APIKeys, ModelConfig } from '@/types';
 import { db, getSources, addSource, deleteSource, promoteSource, getMessages, addMessage, clearWorkspaceMessages } from '@/lib/db';
 import { chunkMarkdown } from '@/lib/vector-search';
+import { savePdfToLocal, deletePdfFromLocal } from '@/lib/indexeddb';
 
 interface WorkspaceContextProps {
   // Sources
@@ -39,8 +40,10 @@ interface WorkspaceContextProps {
   sendWorkspaceMessage: (text: string, image?: string) => Promise<void>;
   sendStagedPaperMessage: (paperId: string, text: string) => Promise<void>;
   clearWorkspaceChat: () => Promise<void>;
-  activeCenterTab: 'chat' | 'canvas';
-  setActiveCenterTab: (tab: 'chat' | 'canvas') => void;
+  activeCenterTab: 'chat' | 'canvas' | 'viewer';
+  setActiveCenterTab: (tab: 'chat' | 'canvas' | 'viewer') => void;
+  selectedViewerDocId: string | null;
+  setSelectedViewerDocId: (id: string | null) => void;
   activeTheme: 'purple' | 'coral' | 'amber' | 'teal' | 'plains';
   updateTheme: (theme: 'purple' | 'coral' | 'amber' | 'teal' | 'plains') => void;
 }
@@ -74,7 +77,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   
   const [searchError, setSearchError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
-  const [activeCenterTab, setActiveCenterTab] = useState<'chat' | 'canvas'>('chat');
+  const [activeCenterTab, setActiveCenterTab] = useState<'chat' | 'canvas' | 'viewer'>('chat');
+  const [selectedViewerDocId, setSelectedViewerDocId] = useState<string | null>(null);
   const [activeTheme, setActiveTheme] = useState<'purple' | 'coral' | 'amber' | 'teal' | 'plains'>('purple');
 
   // Load cached theme from localStorage on mount
@@ -203,6 +207,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       const paperId = `upload_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       const title = file.name.replace(/\.[^/.]+$/, "");
+
+      // Save PDF locally for Viewer
+      await savePdfToLocal(paperId, file);
 
       // 2. Ingest Markdown to Supabase
       const ingestRes = await fetch('/api/ingest', {
@@ -338,6 +345,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const discardStagedPaper = async (id: string) => {
     try {
       await deleteSource(id);
+      await deletePdfFromLocal(id);
       setStagedSources(prev => prev.filter(p => p.id !== id));
       setTrustedSources(prev => prev.filter(p => p.id !== id));
       if (activeStagedPaper?.id === id) {
@@ -621,6 +629,8 @@ ${docContext}
       clearWorkspaceChat,
       activeCenterTab,
       setActiveCenterTab,
+      selectedViewerDocId,
+      setSelectedViewerDocId,
       activeTheme,
       updateTheme
     }}>
