@@ -184,6 +184,7 @@ export const DocumentViewer: React.FC = () => {
             </div>
           ))}
         </div>
+      </div>
       )}
     </div>
   );

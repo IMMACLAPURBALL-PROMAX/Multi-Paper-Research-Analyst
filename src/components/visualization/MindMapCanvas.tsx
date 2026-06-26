@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useWorkspace } from '@/context/WorkspaceContext';
-import { GitFork, Sparkles, RefreshCw, Layers, ZoomIn, ZoomOut, Download, Maximize2, Trash2 } from 'lucide-react';
+import { GitFork, Sparkles, RefreshCw, Layers, ZoomIn, ZoomOut, Download, Maximize2, Trash2, AlertCircle } from 'lucide-react';
 import mermaid from 'mermaid';
 
 // Unique counter to prevent ID collisions in Mermaid renders
@@ -18,6 +18,7 @@ export const MindMapCanvas: React.FC = () => {
   } = useWorkspace();
   const [mermaidCode, setMermaidCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isDeepLoading, setIsDeepLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   
@@ -108,7 +109,7 @@ export const MindMapCanvas: React.FC = () => {
       `Paper [${idx + 1}]: "${doc.title}"\nAbstract: ${doc.abstract}\nAuthors: ${doc.authors.join(', ')}`
     ).join('\n\n');
 
-    const prompt = `You are a research visualization expert. Analyze the following academic papers inside the user's notebook and generate a structured mind map representing the key connections, main themes, methodologies, and findings.
+    const prompt = `You are a research visualization expert. Analyze the following academic papers' abstracts and generate a highly detailed mind map representing the key connections, main themes, methodologies, and findings.
 
 Papers:
 ${corpusSummary}
@@ -116,9 +117,10 @@ ${corpusSummary}
 CRITICAL INSTRUCTIONS:
 1. Return the output strictly as a Mermaid.js mindmap syntax.
 2. The code block must start with "mindmap" on its own line.
-3. Keep labels short and concise (1-4 words per node).
-4. Use standard indents to define relationships.
-5. Do not include extra comments, markdown formatting, or HTML tags inside the mindmap block.
+3. DO NOT CREATE A SIMPLISTIC 4-BRANCH MAP. You MUST break down the concepts deeply. Create at least 15-20 distinct nodes branching out from the root.
+4. Keep labels short and concise (1-4 words per node).
+5. Use standard indents (2 spaces per level) to define relationships.
+6. Do not include extra comments, markdown formatting, or HTML tags inside the mindmap block.
 6. Return ONLY the mermaid code block inside a \`\`\`mermaid codeblock.
 
 Example output format:
@@ -172,6 +174,79 @@ mindmap
     }
   };
 
+  const generateDeepMindMap = async () => {
+    if (trustedSources.length === 0) return;
+    setIsLoading(true);
+    setIsDeepLoading(true);
+    setError(null);
+
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (apiKeys.gemini) headers['x-gemini-key'] = apiKeys.gemini;
+      if (apiKeys.claude) headers['x-anthropic-key'] = apiKeys.claude;
+      if (apiKeys.openai) headers['x-openai-key'] = apiKeys.openai;
+
+      // Fetch all chunks for all trusted sources
+      let massiveContext = '';
+      for (let i = 0; i < trustedSources.length; i++) {
+        const doc = trustedSources[i];
+        massiveContext += `\n\n--- PAPER [${i + 1}]: ${doc.title} ---\n`;
+        const res = await fetch(`/api/chunks/${doc.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.chunks) {
+            massiveContext += data.chunks.map((c: any) => c.content).join('\n\n');
+          }
+        }
+      }
+
+      const prompt = `You are an elite research visualization expert. You are being provided with the FULL TEXT chunks of multiple academic papers. Your task is to perform a deep synthesis and generate a massive, highly detailed Mermaid.js mind map connecting all the methodologies, datasets, key findings, and conclusions across these papers.
+
+Full Text Corpus:
+${massiveContext}
+
+CRITICAL INSTRUCTIONS:
+1. Return the output strictly as a Mermaid.js mindmap syntax.
+2. The code block must start with "mindmap" on its own line.
+3. This is a DEEP SYNTHESIS. You must generate a very large map with at least 30-40 interconnected nodes branching out recursively. Do not skip details.
+4. Keep labels concise (1-5 words per node).
+5. Use standard indents (2 spaces per level) to define relationships.
+6. Do not include extra comments, markdown formatting, or HTML tags inside the mindmap block.
+7. Return ONLY the mermaid code block inside a \`\`\`mermaid codeblock.`;
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          messages: [{ sender: 'user', content: prompt }],
+          provider: modelConfig.provider,
+          model: modelConfig.model
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to generate deep mind map.');
+
+      const content = data.content;
+      const mermaidMatch = content.match(/```mermaid\s*([\s\S]*?)\s*```/) || 
+                           content.match(/```\s*mindmap\s*([\s\S]*?)\s*```/) ||
+                           [null, content];
+                           
+      let extractedCode = mermaidMatch[1]?.trim() || content.trim();
+      if (!extractedCode.startsWith('mindmap')) extractedCode = 'mindmap\n' + extractedCode;
+      
+      setMermaidCode(extractedCode);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Failed to synthesize deep mind map. The model might have timed out or run out of context.');
+    } finally {
+      setIsLoading(false);
+      setIsDeepLoading(false);
+    }
+  };
+
   const hasKeys = !!(apiKeys.gemini || apiKeys.claude || apiKeys.openai);
 
   return (
@@ -205,17 +280,28 @@ mindmap
             {activeCenterTab === 'viewer' && 'Split-screen PDF & chunks'}
           </span>
         </div>
-        
         {trustedSources.length > 0 && hasKeys && (
-          <button 
-            className="btn-sync" 
-            onClick={generateMindMap} 
-            disabled={isLoading}
-            title="Regenerate Mind Map"
-          >
-            <RefreshCw size={13} className={isLoading ? 'spin-anim' : ''} />
-            <span>{mermaidCode ? 'Re-sync' : 'Generate'}</span>
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button 
+              className="btn-sync" 
+              onClick={generateMindMap} 
+              disabled={isLoading}
+              title="Generate a quick map using only abstracts (Low Token)"
+            >
+              <RefreshCw size={13} className={isLoading && !isDeepLoading ? 'spin-anim' : ''} />
+              <span>{mermaidCode ? 'Re-sync Quick Map' : 'Quick Map'}</span>
+            </button>
+            <button 
+              className="btn-sync" 
+              style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#fbbf24', borderColor: 'rgba(234, 179, 8, 0.3)' }}
+              onClick={generateDeepMindMap} 
+              disabled={isLoading}
+              title="Generate a massive map using the full text of all papers (High Token)"
+            >
+              <AlertCircle size={13} />
+              <span>Deep Synthesis (~30k tokens)</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -224,8 +310,12 @@ mindmap
         {isLoading && (
           <div className="canvas-loading animate-fade-in">
             <div className="spinner"></div>
-            <h3>Synthesizing Documents...</h3>
-            <p className="hint">Extracting topics, grouping methodologies, and formatting mind map nodes.</p>
+            <h3>{isDeepLoading ? 'Deep Synthesizing Full Text...' : 'Synthesizing Abstracts...'}</h3>
+            <p className="hint">
+              {isDeepLoading 
+                ? 'This may take 10-15 seconds. Scanning thousands of tokens across all methodologies and findings.' 
+                : 'Extracting topics, grouping methodologies, and formatting mind map nodes.'}
+            </p>
           </div>
         )}
 
