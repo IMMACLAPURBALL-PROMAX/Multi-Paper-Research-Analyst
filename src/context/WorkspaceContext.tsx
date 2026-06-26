@@ -415,6 +415,7 @@ CRITICAL INSTRUCTIONS:
 `;
 
       let groundedSources: Array<{ id: string; title: string }> = [];
+      const conversationalHistory = [...mainChatHistory, userMsg].slice(-6);
       
       if (trustedSources.length > 0) {
         // 1. Inject a global catalog of active notebook documents with their abstracts
@@ -431,7 +432,6 @@ CRITICAL INSTRUCTIONS:
         const activeIdsSet = new Set(trustedIds);
 
         // Smart Pruning & Token Reduction: Keep max 6 messages, filter out deleted paper citations
-        const conversationalHistory = [...mainChatHistory, userMsg].slice(-6);
         const prunedHistory = conversationalHistory.filter(msg => {
           if (msg.sender === 'user') return true;
           if (msg.sources && msg.sources.length > 0) {
