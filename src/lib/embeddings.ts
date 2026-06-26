@@ -24,14 +24,14 @@ export async function generateEmbeddings(
   if (provider === 'gemini') {
     if (!geminiKey) throw new Error('Gemini API Key missing for embeddings.');
     
-    const batches = chunkArray(texts, 100);
+    const batches = chunkArray(texts, 25);
     const allEmbeddings: number[][] = [];
     
     for (const batch of batches) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key=${geminiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:batchEmbedContents?key=${geminiKey}`;
       const payload = {
         requests: batch.map(text => ({
-          model: "models/gemini-embedding-001",
+          model: "models/text-embedding-004",
           content: { parts: [{ text }] }
         }))
       };
