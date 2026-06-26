@@ -4,6 +4,8 @@ import { cosineSimilarity } from '@/lib/vector-search';
 import { generateEmbeddings } from '@/lib/embeddings';
 import { supabase } from '@/lib/supabase';
 
+export const maxDuration = 60; // Prevent 504 Vercel timeout errors
+
 // 1. Google Gemini API Request Executor
 async function executeGeminiRequest(
   apiKey: string, 

@@ -3,6 +3,8 @@ import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { generateEmbeddings } from '@/lib/embeddings';
 import { supabase } from '@/lib/supabase';
 
+export const maxDuration = 60; // Prevent 504 Vercel timeout errors
+
 export async function POST(request: Request) {
   try {
     const { documentId, markdown, provider, geminiKey, openaiKey } = await request.json();

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { generateEmbeddings } from '@/lib/embeddings';
 
+export const maxDuration = 60; // Prevent 504 Vercel timeout errors
+
 export async function POST(request: Request) {
   try {
     const { texts, provider: requestedProvider } = await request.json();
