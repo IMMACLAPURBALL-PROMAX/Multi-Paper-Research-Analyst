@@ -96,7 +96,9 @@ export async function generateEmbeddings(
       
       const data = await response.json();
       data.data.sort((a: any, b: any) => a.index - b.index);
-      const batchEmbeddings = data.data.map((d: any) => d.embedding);
+      // Manually truncate to 768 dimensions (Matryoshka representation) 
+      // because GitHub Models / Azure APIs often ignore the dimensions parameter
+      const batchEmbeddings = data.data.map((d: any) => d.embedding.slice(0, 768));
       allEmbeddings.push(...batchEmbeddings);
     }
     return allEmbeddings;
