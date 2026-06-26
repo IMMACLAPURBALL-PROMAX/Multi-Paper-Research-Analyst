@@ -9,9 +9,9 @@ You MUST EXCLUSIVELY run:
 Failure to follow this rule will cause environment inconsistencies.
 <!-- END:vercel-testing-rule -->
 
-<!-- BEGIN:git-push-rule -->
-# STRICT INVARIANT: Do Not Git Push Without Permission
+<!-- BEGIN:git-command-rule -->
+# STRICT INVARIANT: Do Not Run Any Git Commands Without Permission
 
-You MUST NEVER execute a `git push` command automatically under any circumstances. 
-Always stop and wait for the user to explicitly say "push". You may commit changes locally using `git commit`, but pushing requires explicit user approval.
-<!-- END:git-push-rule -->
+You MUST NEVER execute ANY `git` commands (including `git add`, `git commit`, `git push`, `git pull`, etc.) automatically under any circumstances. 
+Always make your code changes, summarize them, and stop. Wait for the user to explicitly instruct you to "commit" or "push". Only execute git commands when the user gives direct, explicit permission for that specific action.
+<!-- END:git-command-rule -->

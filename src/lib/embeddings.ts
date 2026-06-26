@@ -48,7 +48,7 @@ export async function generateEmbeddings(
       }
       
       const data = await response.json();
-      const batchEmbeddings = data.embeddings.map((e: any) => e.values);
+      const batchEmbeddings = data.embeddings.map((e: any) => e.values.slice(0, 768));
       allEmbeddings.push(...batchEmbeddings);
     }
     return allEmbeddings;
