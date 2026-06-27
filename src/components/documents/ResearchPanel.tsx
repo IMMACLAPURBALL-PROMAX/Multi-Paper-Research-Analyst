@@ -105,7 +105,7 @@ export const ResearchPanel: React.FC = () => {
             <input 
               id="limit-slider"
               type="range" 
-              min="10" 
+              min="0" 
               max="100" 
               step="5" 
               value={searchLimit}

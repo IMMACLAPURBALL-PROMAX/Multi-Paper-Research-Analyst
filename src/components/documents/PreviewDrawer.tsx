@@ -199,7 +199,7 @@ export const PreviewDrawer: React.FC = () => {
           max-width: 85%;
         }
         .drawer-title-area h3 {
-          font-size: 13px;
+          font-size: 18px;
           font-weight: 600;
           color: var(--text-primary);
           line-height: 1.4;
@@ -283,13 +283,11 @@ export const PreviewDrawer: React.FC = () => {
           gap: 12px;
         }
         .abstract-text {
-          font-size: 11px;
+          font-size: 13px;
           color: var(--text-secondary);
-          line-height: 1.5;
-          max-height: 120px;
-          overflow-y: auto;
+          line-height: 1.6;
           background: rgba(10, 15, 29, 0.4);
-          padding: 8px;
+          padding: 12px;
           border-radius: var(--radius-sm);
           border: 1px solid rgba(148, 163, 184, 0.05);
         }
@@ -309,13 +307,14 @@ export const PreviewDrawer: React.FC = () => {
           background: rgba(148, 163, 184, 0.02);
           border: 1px solid var(--border-color);
           border-radius: var(--radius-md);
-          padding: 12px;
+          padding: 16px;
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 12px;
+          flex-grow: 1;
         }
         .isolated-chat-section h4 {
-          font-size: 12px;
+          font-size: 14px;
           font-weight: 600;
         }
         .chat-explanation {
@@ -323,12 +322,13 @@ export const PreviewDrawer: React.FC = () => {
           color: var(--text-muted);
         }
         .staged-chat-messages {
-          height: 160px;
+          flex-grow: 1;
+          min-height: 200px;
           overflow-y: auto;
           background: rgba(10, 15, 29, 0.5);
           border: 1px solid var(--border-color);
           border-radius: var(--radius-sm);
-          padding: 8px;
+          padding: 12px;
         }
         .staged-chat-empty {
           height: 100%;
