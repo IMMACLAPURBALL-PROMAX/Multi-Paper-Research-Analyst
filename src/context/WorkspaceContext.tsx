@@ -582,8 +582,8 @@ CRITICAL INSTRUCTIONS:
 Your goal is to answer questions about this specific paper: "${paper.title}".
 
 CRITICAL INSTRUCTIONS:
-1. Ground your answers in the document details provided below. You have web search capability enabled—feel free to search the internet for more details, findings, or explanations about this specific paper ("${paper.title}") if the details provided below are insufficient.
-${isPromoted ? '' : '2. If the user asks general research questions, remind them that this paper is staged and they must promote it to the notebook to combine it with other sources.\n'}3. Be precise, objective, and cite only this document.
+1. Ground your answers using BOTH the document details provided below AND any web search results provided. You have web search capability enabled—feel free to use the internet search context to provide deep, detailed explanations about this specific paper ("${paper.title}").
+${isPromoted ? '' : '2. This paper is currently staged. You MUST use the web search results to provide detailed answers about it. Do NOT tell the user to promote the paper to the notebook unless you absolutely cannot find the answer in the abstract or the web search results.\n'}3. Be precise and objective.
 
 Paper Details:
 ${docContext}
