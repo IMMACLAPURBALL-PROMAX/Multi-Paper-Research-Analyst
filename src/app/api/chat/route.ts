@@ -315,6 +315,32 @@ async function searchWeb(query: string): Promise<string[]> {
   }
 }
 
+// Helper to perform web search and enrich system instruction with paper title context if available
+async function getSearchEnrichedInstruction(systemInstruction: string, messages: any[]): Promise<string> {
+  const lastUserMessage = messages.slice().reverse().find((msg: any) => msg.sender === 'user' || msg.role === 'user')?.content || '';
+  if (!lastUserMessage) return systemInstruction;
+  
+  let searchQuery = lastUserMessage;
+  const titleMatch = systemInstruction?.match(/Document Title: "([^"]+)"/) || systemInstruction?.match(/specific paper: "([^"]+)"/);
+  if (titleMatch && titleMatch[1]) {
+    const paperTitle = titleMatch[1];
+    // If the paper title isn't already in the user message, prefix it to make the search relevant to this specific paper
+    if (!lastUserMessage.toLowerCase().includes(paperTitle.toLowerCase())) {
+      searchQuery = `"${paperTitle}" ${lastUserMessage}`;
+    }
+  }
+
+  console.log(`[Web Search] Query: "${searchQuery}"`);
+  const searchResults = await searchWeb(searchQuery);
+  
+  if (searchResults.length > 0) {
+    return systemInstruction + `\n\nWEB SEARCH RESULTS FOR GROUNDING:\n` +
+      searchResults.map((snippet, i) => `Result [${i + 1}]: "${snippet}"`).join('\n') + `\n\n`;
+  }
+  
+  return systemInstruction;
+}
+
 // Removed getPipeline() because we now decouple embedding logic to the Edge-based /api/embed endpoint
 
 // POST endpoint handler
@@ -485,14 +511,7 @@ export async function POST(request: Request) {
           if (endpoint.provider === 'gemini') {
             isGeminiSearch = true;
           } else {
-            const lastUserMessage = messages.slice().reverse().find((msg: any) => msg.sender === 'user' || msg.role === 'user')?.content || '';
-            if (lastUserMessage) {
-              const searchResults = await searchWeb(lastUserMessage);
-              if (searchResults.length > 0) {
-                finalInstruction = (systemInstruction || '') + `\n\nWEB SEARCH RESULTS FOR GROUNDING:\n` +
-                  searchResults.map((snippet, i) => `Result [${i + 1}]: "${snippet}"`).join('\n') + `\n\n`;
-              }
-            }
+            finalInstruction = await getSearchEnrichedInstruction(systemInstruction || '', messages);
           }
         }
 
@@ -531,14 +550,7 @@ export async function POST(request: Request) {
     // -------------------------------------------------------------
     let enrichedSystemInstruction = systemInstruction || '';
     if (enableSearch && provider !== 'gemini') {
-      const lastUserMessage = messages.slice().reverse().find((msg: any) => msg.sender === 'user' || msg.role === 'user')?.content || '';
-      if (lastUserMessage) {
-        const searchResults = await searchWeb(lastUserMessage);
-        if (searchResults.length > 0) {
-          enrichedSystemInstruction += `\n\nWEB SEARCH RESULTS FOR GROUNDING:\n` +
-            searchResults.map((snippet, i) => `Result [${i + 1}]: "${snippet}"`).join('\n') + `\n\n`;
-        }
-      }
+      enrichedSystemInstruction = await getSearchEnrichedInstruction(enrichedSystemInstruction, messages);
     }
 
     if (provider === 'gemini') {
