@@ -210,7 +210,7 @@ async function fetchArxiv(query: string, limit: number): Promise<DocumentSource[
       'User-Agent': 'MultiPaperResearchAnalyst/1.0'
     },
     // Prevent aggressive proxy caching
-    next: { revalidate: 60 }
+    cache: 'no-store'
   });
 
   if (!response.ok) {
@@ -432,7 +432,7 @@ async function fetchOpenAlexRaw(query: string, limit: number, apiKey?: string | 
     }
   }
   const url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=${limit}${authParam}`;
-  const res = await fetch(url, { next: { revalidate: 60 } });
+  const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`OpenAlex error: ${res.status} ${await res.text()}`);
   
   const data = await res.json();
@@ -504,7 +504,7 @@ async function fetchCoreRaw(query: string, limit: number, apiKey?: string): Prom
   const url = `https://api.core.ac.uk/v3/search/works?q=${encodeURIComponent(query)}&limit=${limit}`;
   const res = await fetch(url, {
     headers: { 'Authorization': `Bearer ${apiKey}` },
-    next: { revalidate: 60 }
+    cache: 'no-store'
   });
   
   if (!res.ok) throw new Error(`CORE API error: ${res.status}`);
