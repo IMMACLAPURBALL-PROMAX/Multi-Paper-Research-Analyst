@@ -435,12 +435,29 @@ CRITICAL INSTRUCTIONS:
       if (trustedSources.length > 0) {
         // 1. Inject a global catalog of active notebook documents with their abstracts
         systemInstruction += `\n\nActive Notebook Documents (Total: ${trustedSources.length}):\n`;
-        trustedSources.forEach((doc, idx) => {
+        for (let idx = 0; idx < trustedSources.length; idx++) {
+          const doc = trustedSources[idx];
           const docNum = idx + 1;
+          
+          let abstractText = doc.abstract;
+          if (!abstractText || abstractText.trim() === '') {
+            try {
+              const res = await fetch(`/api/chunks/${doc.id}`);
+              if (res.ok) {
+                const data = await res.json();
+                if (data.chunks && data.chunks.length > 0) {
+                  abstractText = data.chunks.slice(0, 3).map((c: any) => c.content).join('\n...\n');
+                }
+              }
+            } catch (e) {
+              console.error("Failed to fetch fallback chunks for chat prompt", e);
+            }
+          }
+
           systemInstruction += `\n[Document ${docNum}] Title: "${doc.title}" (Source ID: ${doc.id})\n`;
           systemInstruction += `Authors: ${doc.authors.join(', ')}\n`;
-          systemInstruction += `Abstract: ${doc.abstract || 'No abstract available.'}\n`;
-        });
+          systemInstruction += `Abstract/Summary: ${abstractText || 'No abstract available.'}\n`;
+        }
 
         // 2. Identify the document IDs to search over
         const trustedIds = trustedSources.map(doc => doc.id);

@@ -360,23 +360,28 @@ export async function POST(request: Request) {
         
         const queryVector = queryEmbeddings[0];
 
-        // Fetch top 5 chunks using Hybrid Search RPC (RRF combining Full Text & Vector)
-        // We filter by document_id to ensure we only search trusted/staged sources
-        const { data: topChunks, error } = await supabase.rpc('hybrid_search', {
+        // Fetch top chunks using Hybrid Search RPC (RRF combining Full Text & Vector)
+        // We fetch 20 and strictly filter locally to ensure no ghost documents leak through
+        let { data: topChunks, error } = await supabase.rpc('hybrid_search', {
           query_text: lastUserMsg.content,
           query_embedding: queryVector,
-          match_count: 5
-        }).in('document_id', documentIds);
+          match_count: 20
+        });
 
         if (error) {
           console.error("Supabase hybrid search failed:", error);
         } else if (topChunks && topChunks.length > 0) {
-          systemInstruction = (systemInstruction || '') + `\n\nTrusted Sources Context Excerpts (Top 5 Hybrid Matches):\n`;
-          topChunks.forEach((c: any, idx: number) => {
-            systemInstruction += `\nExcerpt [${idx + 1}] (Source ID: ${c.document_id}):\n${c.content}\n`;
-          });
+          // Strictly filter to active documentIds, then take the top 5
+          topChunks = topChunks.filter((c: any) => documentIds.includes(c.document_id)).slice(0, 5);
           
-          systemInstruction += `\n\nCRITICAL GROUNDING CONSTRAINT: You must ONLY answer using the Trusted Sources Context Excerpts AND the Active Notebook Documents catalog provided above. If the combined context does not contain the answer to the user's question, state 'I cannot answer this based on the provided documents.' Do not hallucinate external information.`;
+          if (topChunks.length > 0) {
+            systemInstruction = (systemInstruction || '') + `\n\nTrusted Sources Context Excerpts (Top 5 Hybrid Matches):\n`;
+            topChunks.forEach((c: any, idx: number) => {
+              systemInstruction += `\nExcerpt [${idx + 1}] (Source ID: ${c.document_id}):\n${c.content}\n`;
+            });
+            
+            systemInstruction += `\n\nCRITICAL GROUNDING CONSTRAINT: You must ONLY answer using the Trusted Sources Context Excerpts AND the Active Notebook Documents catalog provided above. If the combined context does not contain the answer to the user's question, state 'I cannot answer this based on the provided documents.' Do not hallucinate external information.`;
+          }
         }
       }
     }
