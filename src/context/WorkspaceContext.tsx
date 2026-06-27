@@ -437,7 +437,7 @@ CRITICAL INSTRUCTIONS:
         systemInstruction += `\n\nActive Notebook Documents (Total: ${trustedSources.length}):\n`;
         trustedSources.forEach((doc, idx) => {
           const docNum = idx + 1;
-          systemInstruction += `\n[Document ${docNum}] Title: "${doc.title}" (ID: ${doc.id})\n`;
+          systemInstruction += `\n[Document ${docNum}] Title: "${doc.title}" (Source ID: ${doc.id})\n`;
           systemInstruction += `Authors: ${doc.authors.join(', ')}\n`;
           systemInstruction += `Abstract: ${doc.abstract || 'No abstract available.'}\n`;
         });

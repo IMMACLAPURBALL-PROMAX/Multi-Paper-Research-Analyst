@@ -373,7 +373,7 @@ export async function POST(request: Request) {
         } else if (topChunks && topChunks.length > 0) {
           systemInstruction = (systemInstruction || '') + `\n\nTrusted Sources Context Excerpts (Top 5 Hybrid Matches):\n`;
           topChunks.forEach((c: any, idx: number) => {
-            systemInstruction += `\nExcerpt [${idx + 1}]:\n${c.content}\n`;
+            systemInstruction += `\nExcerpt [${idx + 1}] (Source ID: ${c.document_id}):\n${c.content}\n`;
           });
           
           systemInstruction += `\n\nCRITICAL GROUNDING CONSTRAINT: You must ONLY answer using the Trusted Sources Context Excerpts AND the Active Notebook Documents catalog provided above. If the combined context does not contain the answer to the user's question, state 'I cannot answer this based on the provided documents.' Do not hallucinate external information.`;

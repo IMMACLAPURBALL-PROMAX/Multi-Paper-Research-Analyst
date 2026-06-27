@@ -21,6 +21,7 @@ export const MindMapCanvas: React.FC = () => {
   const [isDeepLoading, setIsDeepLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [targetPdfId, setTargetPdfId] = useState<string>('all');
   
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -93,7 +94,8 @@ export const MindMapCanvas: React.FC = () => {
   }, [mermaidCode]);
 
   const generateMindMap = async () => {
-    if (trustedSources.length === 0) return;
+    const sourcesToUse = targetPdfId === 'all' ? trustedSources : trustedSources.filter(s => s.id === targetPdfId);
+    if (sourcesToUse.length === 0) return;
     setIsLoading(true);
     setError(null);
 
@@ -106,8 +108,8 @@ export const MindMapCanvas: React.FC = () => {
 
     // Create a corpus summary for the LLM
     let corpusSummary = '';
-    for (let idx = 0; idx < trustedSources.length; idx++) {
-      const doc = trustedSources[idx];
+    for (let idx = 0; idx < sourcesToUse.length; idx++) {
+      const doc = sourcesToUse[idx];
       let abstractText = doc.abstract;
       
       // Fallback: If abstract is empty or missing, fetch the first 3 chunks as a pseudo-abstract
@@ -194,7 +196,8 @@ mindmap
   };
 
   const generateDeepMindMap = async () => {
-    if (trustedSources.length === 0) return;
+    const sourcesToUse = targetPdfId === 'all' ? trustedSources : trustedSources.filter(s => s.id === targetPdfId);
+    if (sourcesToUse.length === 0) return;
     setIsLoading(true);
     setIsDeepLoading(true);
     setError(null);
@@ -209,8 +212,8 @@ mindmap
 
       // Fetch all chunks for all trusted sources
       let massiveContext = '';
-      for (let i = 0; i < trustedSources.length; i++) {
-        const doc = trustedSources[i];
+      for (let i = 0; i < sourcesToUse.length; i++) {
+        const doc = sourcesToUse[i];
         massiveContext += `\n\n--- PAPER [${i + 1}]: ${doc.title} ---\n`;
         const res = await fetch(`/api/chunks/${doc.id}`);
         if (res.ok) {
@@ -305,6 +308,26 @@ CRITICAL INSTRUCTIONS:
         </div>
         {trustedSources.length > 0 && hasKeys && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <select 
+              value={targetPdfId} 
+              onChange={(e) => setTargetPdfId(e.target.value)}
+              style={{
+                background: 'rgba(15, 23, 42, 0.4)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-secondary)',
+                padding: '6px 10px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: '12px',
+                outline: 'none'
+              }}
+            >
+              <option value="all">All PDFs</option>
+              {trustedSources.map(doc => (
+                <option key={doc.id} value={doc.id}>
+                  {doc.title.length > 25 ? doc.title.substring(0, 25) + '...' : doc.title}
+                </option>
+              ))}
+            </select>
             <button 
               className="btn-sync" 
               onClick={generateMindMap} 
