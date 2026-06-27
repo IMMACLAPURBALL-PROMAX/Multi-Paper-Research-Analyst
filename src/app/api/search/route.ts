@@ -170,28 +170,28 @@ export async function GET(request: Request) {
 
   const normalizeTitle = (title: string) => title.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-  // Prioritize Semantic Scholar and OpenAlex results since they have citation count metrics
-  for (const paper of [...s2Results, ...openAlexResults, ...coreResults, ...pubmedResults]) {
-    const norm = normalizeTitle(paper.title);
-    if (!seenTitles.has(norm)) {
-      seenTitles.add(norm);
-      mergedPapers.push(paper);
-    }
-  }
-
-  for (const paper of arxivResults) {
-    const norm = normalizeTitle(paper.title);
-    if (!seenTitles.has(norm)) {
-      seenTitles.add(norm);
-      mergedPapers.push(paper);
-    } else {
-      // If we already saw the paper, update metadata with arXiv ID
-      const index = mergedPapers.findIndex(p => normalizeTitle(p.title) === norm);
-      if (index !== -1 && paper.metadata.arXivId) {
-        mergedPapers[index].metadata.arXivId = paper.metadata.arXivId;
-        // Also copy PDF URL if earlier fetch didn't find one
-        if (!mergedPapers[index].metadata.pdfUrl) {
-          mergedPapers[index].metadata.pdfUrl = paper.metadata.pdfUrl;
+  // Interleave results so "all" engine returns a balanced mix of papers
+  const maxLen = Math.max(s2Results.length, openAlexResults.length, coreResults.length, pubmedResults.length, arxivResults.length);
+  
+  for (let i = 0; i < maxLen; i++) {
+    // Prioritize high-quality metadata sources first in the interleaving order
+    const roundPapers = [s2Results[i], openAlexResults[i], coreResults[i], pubmedResults[i], arxivResults[i]].filter(Boolean);
+    
+    for (const paper of roundPapers) {
+      const norm = normalizeTitle(paper.title);
+      if (!seenTitles.has(norm)) {
+        seenTitles.add(norm);
+        mergedPapers.push(paper);
+      } else {
+        // If we already saw the paper, update metadata with arXiv ID or PDF if available
+        const index = mergedPapers.findIndex(p => normalizeTitle(p.title) === norm);
+        if (index !== -1) {
+          if (paper.metadata.arXivId) {
+            mergedPapers[index].metadata.arXivId = paper.metadata.arXivId;
+          }
+          if (!mergedPapers[index].metadata.pdfUrl && paper.metadata.pdfUrl) {
+            mergedPapers[index].metadata.pdfUrl = paper.metadata.pdfUrl;
+          }
         }
       }
     }
