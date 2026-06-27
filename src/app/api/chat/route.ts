@@ -360,23 +360,37 @@ export async function POST(request: Request) {
         
         const queryVector = queryEmbeddings[0];
 
-        // Fetch top chunks using Hybrid Search RPC (RRF combining Full Text & Vector)
-        // We fetch 20 and strictly filter locally to ensure no ghost documents leak through
+        // Fetch a deep pool of chunks using Hybrid Search RPC (RRF combining Full Text & Vector)
         let { data: topChunks, error } = await supabase.rpc('hybrid_search', {
           query_text: lastUserMsg.content,
           query_embedding: queryVector,
-          match_count: 20
+          match_count: 50 // Fetch a deep pool to ensure we can find chunks for all active documents
         });
 
         if (error) {
           console.error("Supabase hybrid search failed:", error);
         } else if (topChunks && topChunks.length > 0) {
-          // Strictly filter to active documentIds, then take the top 5
-          topChunks = topChunks.filter((c: any) => documentIds.includes(c.document_id)).slice(0, 5);
+          // Implement Balanced Per-Document Retrieval: Take the top 5 chunks for EACH active document
+          let balancedChunks: any[] = [];
+          const chunksByDoc: Record<string, any[]> = {};
           
-          if (topChunks.length > 0) {
-            systemInstruction = (systemInstruction || '') + `\n\nTrusted Sources Context Excerpts (Top 5 Hybrid Matches):\n`;
-            topChunks.forEach((c: any, idx: number) => {
+          topChunks.forEach((c: any) => {
+            if (!documentIds.includes(c.document_id)) return; // Strictly filter out ghost documents
+            
+            if (!chunksByDoc[c.document_id]) {
+              chunksByDoc[c.document_id] = [];
+            }
+            
+            // Limit to 5 chunks per document
+            if (chunksByDoc[c.document_id].length < 5) {
+              chunksByDoc[c.document_id].push(c);
+              balancedChunks.push(c);
+            }
+          });
+          
+          if (balancedChunks.length > 0) {
+            systemInstruction = (systemInstruction || '') + `\n\nTrusted Sources Context Excerpts (Balanced Matches):\n`;
+            balancedChunks.forEach((c: any, idx: number) => {
               systemInstruction += `\nExcerpt [${idx + 1}] (Source ID: ${c.document_id}):\n${c.content}\n`;
             });
             
