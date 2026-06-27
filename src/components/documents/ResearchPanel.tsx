@@ -16,7 +16,7 @@ export const ResearchPanel: React.FC = () => {
   } = useWorkspace();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchEngine, setSearchEngine] = useState<'all' | 'arxiv' | 'semanticscholar'>('all');
+  const [searchEngine, setSearchEngine] = useState<'all' | 'arxiv' | 'semanticscholar' | 'pubmed' | 'openalex' | 'core'>('all');
 
   const handleSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,6 +73,30 @@ export const ResearchPanel: React.FC = () => {
             >
               S. Scholar
             </button>
+            <button
+              type="button"
+              className={`engine-btn ${searchEngine === 'pubmed' ? 'active' : ''}`}
+              onClick={() => setSearchEngine('pubmed')}
+              disabled={isSearching}
+            >
+              PubMed
+            </button>
+            <button
+              type="button"
+              className={`engine-btn ${searchEngine === 'openalex' ? 'active' : ''}`}
+              onClick={() => setSearchEngine('openalex')}
+              disabled={isSearching}
+            >
+              OpenAlex
+            </button>
+            <button
+              type="button"
+              className={`engine-btn ${searchEngine === 'core' ? 'active' : ''}`}
+              onClick={() => setSearchEngine('core')}
+              disabled={isSearching}
+            >
+              CORE
+            </button>
           </div>
         </form>
         {searchError && <p className="error-text">{searchError}</p>}
@@ -90,10 +114,16 @@ export const ResearchPanel: React.FC = () => {
             <div className="spinner"></div>
             <span>
               {searchEngine === 'all'
-                ? 'Querying arXiv & Semantic Scholar...'
+                ? 'Querying multiple databases...'
                 : searchEngine === 'arxiv'
                 ? 'Querying arXiv...'
-                : 'Querying Semantic Scholar...'}
+                : searchEngine === 'semanticscholar'
+                ? 'Querying Semantic Scholar...'
+                : searchEngine === 'pubmed'
+                ? 'Querying PubMed...'
+                : searchEngine === 'openalex'
+                ? 'Querying OpenAlex...'
+                : 'Querying CORE API...'}
             </span>
           </div>
         )}

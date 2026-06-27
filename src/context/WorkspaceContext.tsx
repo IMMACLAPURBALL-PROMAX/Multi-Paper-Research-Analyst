@@ -34,7 +34,7 @@ interface WorkspaceContextProps {
   updateApiKeys: (keys: APIKeys) => void;
   updateModelConfig: (config: ModelConfig) => void;
   uploadPDF: (file: File) => Promise<void>;
-  searchPapers: (query: string, engine?: 'all' | 'arxiv' | 'semanticscholar') => Promise<DocumentSource[]>;
+  searchPapers: (query: string, engine?: 'all' | 'arxiv' | 'semanticscholar' | 'pubmed' | 'openalex' | 'core') => Promise<DocumentSource[]>;
   promotePaperToTrusted: (id: string) => Promise<void>;
   discardStagedPaper: (id: string) => Promise<void>;
   sendWorkspaceMessage: (text: string, image?: string) => Promise<void>;
@@ -281,7 +281,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   // 4. Academic Search
-  const searchPapers = async (query: string, engine: 'all' | 'arxiv' | 'semanticscholar' = 'all'): Promise<DocumentSource[]> => {
+  const searchPapers = async (query: string, engine: 'all' | 'arxiv' | 'semanticscholar' | 'pubmed' | 'openalex' | 'core' = 'all'): Promise<DocumentSource[]> => {
     setIsSearching(true);
     setSearchError(null);
     try {

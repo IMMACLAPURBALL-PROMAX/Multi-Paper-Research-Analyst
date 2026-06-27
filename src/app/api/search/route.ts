@@ -102,6 +102,8 @@ export async function GET(request: Request) {
                 process.env.SEMANTIC_SCHOLAR_API_KEY || 
                 's2k-IgaFq5lzt3YyD5IF0tSJRJSspaEHVhHWx4NzEY3y';
 
+  const coreKey = request.headers.get('x-core-key') || process.env.CORE_API_KEY;
+
   if (!query) {
     return NextResponse.json({ error: 'Search query parameter "q" is required.' }, { status: 400 });
   }
@@ -131,9 +133,33 @@ export async function GET(request: Request) {
       })
     : Promise.resolve([]);
 
-  const [arxivResults, s2Results] = await Promise.all([
+  const fetchPubMedPromise = (engine === 'all' || engine === 'pubmed')
+    ? fetchPubMed(normalizedQuery, limit).catch(err => {
+        console.error('PubMed Search Error:', err);
+        return [];
+      })
+    : Promise.resolve([]);
+
+  const fetchOpenAlexPromise = (engine === 'all' || engine === 'openalex')
+    ? fetchOpenAlex(normalizedQuery, limit).catch(err => {
+        console.error('OpenAlex Search Error:', err);
+        return [];
+      })
+    : Promise.resolve([]);
+
+  const fetchCorePromise = (engine === 'all' || engine === 'core')
+    ? fetchCore(normalizedQuery, limit, coreKey).catch(err => {
+        console.error('CORE Search Error:', err);
+        return [];
+      })
+    : Promise.resolve([]);
+
+  const [arxivResults, s2Results, pubmedResults, openAlexResults, coreResults] = await Promise.all([
     fetchArxivPromise,
-    fetchS2Promise
+    fetchS2Promise,
+    fetchPubMedPromise,
+    fetchOpenAlexPromise,
+    fetchCorePromise
   ]);
 
   // Merge and deduplicate results by Normalized Title
@@ -142,8 +168,8 @@ export async function GET(request: Request) {
 
   const normalizeTitle = (title: string) => title.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-  // Prioritize Semantic Scholar results since they have citation count metrics
-  for (const paper of s2Results) {
+  // Prioritize Semantic Scholar and OpenAlex results since they have citation count metrics
+  for (const paper of [...s2Results, ...openAlexResults, ...coreResults, ...pubmedResults]) {
     const norm = normalizeTitle(paper.title);
     if (!seenTitles.has(norm)) {
       seenTitles.add(norm);
@@ -157,11 +183,11 @@ export async function GET(request: Request) {
       seenTitles.add(norm);
       mergedPapers.push(paper);
     } else {
-      // If we already saw the paper in S2, update S2 item's metadata with arXiv ID
+      // If we already saw the paper, update metadata with arXiv ID
       const index = mergedPapers.findIndex(p => normalizeTitle(p.title) === norm);
       if (index !== -1 && paper.metadata.arXivId) {
         mergedPapers[index].metadata.arXivId = paper.metadata.arXivId;
-        // Also copy PDF URL if S2 didn't find one
+        // Also copy PDF URL if earlier fetch didn't find one
         if (!mergedPapers[index].metadata.pdfUrl) {
           mergedPapers[index].metadata.pdfUrl = paper.metadata.pdfUrl;
         }
@@ -268,6 +294,147 @@ async function fetchSemanticScholarRaw(query: string, limit: number, apiKey?: st
       id: `s2_${item.paperId}`,
       title: item.title || 'Untitled Semantic Scholar Paper',
       authors,
+      abstract: item.abstract || '',
+      metadata,
+      status: 'staged',
+      addedAt: Date.now()
+    };
+  });
+}
+
+// Fetch helper for PubMed
+async function fetchPubMed(query: string, limit: number): Promise<DocumentSource[]> {
+  const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=${limit}&retmode=json`;
+  const searchRes = await fetch(searchUrl, { next: { revalidate: 60 } });
+  if (!searchRes.ok) throw new Error(`PubMed Search error: ${searchRes.status}`);
+  
+  const searchData = await searchRes.json();
+  const ids = searchData.esearchresult?.idlist || [];
+  if (ids.length === 0) return [];
+
+  const fetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${ids.join(',')}&retmode=xml`;
+  const fetchRes = await fetch(fetchUrl, { next: { revalidate: 60 } });
+  if (!fetchRes.ok) throw new Error(`PubMed Fetch error: ${fetchRes.status}`);
+  
+  const xmlText = await fetchRes.text();
+  const papers: DocumentSource[] = [];
+  const articleMatches = xmlText.match(/<PubmedArticle>([\s\S]*?)<\/PubmedArticle>/g) || [];
+  
+  for (const article of articleMatches) {
+    const pmidMatch = article.match(/<PMID[^>]*>([\s\S]*?)<\/PMID>/);
+    const pmid = pmidMatch ? pmidMatch[1].trim() : '';
+    
+    const titleMatch = article.match(/<ArticleTitle[^>]*>([\s\S]*?)<\/ArticleTitle>/);
+    const title = titleMatch ? cleanText(titleMatch[1]) : 'Untitled PubMed Paper';
+    
+    const abstractMatches = article.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/g) || [];
+    const abstract = abstractMatches.map(a => {
+      const t = a.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/);
+      return t ? cleanText(t[1]) : '';
+    }).join('\n');
+
+    const authorMatches = article.match(/<Author[^>]*>([\s\S]*?)<\/Author>/g) || [];
+    const authors = authorMatches.map(a => {
+      const ln = a.match(/<LastName>([\s\S]*?)<\/LastName>/);
+      const fn = a.match(/<ForeName>([\s\S]*?)<\/ForeName>/);
+      return `${fn ? fn[1] : ''} ${ln ? ln[1] : ''}`.trim();
+    }).filter(a => a);
+
+    const yearMatch = article.match(/<PubDate>[\s\S]*?<Year>([\s\S]*?)<\/Year>[\s\S]*?<\/PubDate>/);
+    const doiMatch = article.match(/<ArticleId IdType="doi">([\s\S]*?)<\/ArticleId>/);
+    
+    const metadata: PaperMetadata = {
+      venue: 'PubMed',
+      publishedYear: yearMatch ? parseInt(yearMatch[1]) : undefined,
+      url: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
+      doi: doiMatch ? cleanText(doiMatch[1]) : undefined,
+      citationCount: 0
+    };
+
+    papers.push({
+      id: `pubmed_${pmid}`,
+      title,
+      authors: authors.length > 0 ? authors : ['Unknown Author'],
+      abstract,
+      metadata,
+      status: 'staged',
+      addedAt: Date.now()
+    });
+  }
+  return papers;
+}
+
+// Fetch helper for OpenAlex
+async function fetchOpenAlex(query: string, limit: number): Promise<DocumentSource[]> {
+  const mailto = 'mailto=research@example.com';
+  const url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=${limit}&${mailto}`;
+  const res = await fetch(url, { next: { revalidate: 60 } });
+  if (!res.ok) throw new Error(`OpenAlex error: ${res.status}`);
+  
+  const data = await res.json();
+  return (data.results || []).map((item: any) => {
+    let abstract = '';
+    if (item.abstract_inverted_index) {
+      const index = item.abstract_inverted_index;
+      const words: string[] = [];
+      for (const [word, positions] of Object.entries(index)) {
+        (positions as number[]).forEach(pos => {
+          words[pos] = word;
+        });
+      }
+      abstract = words.join(' ');
+    }
+
+    const metadata: PaperMetadata = {
+      citationCount: item.cited_by_count || 0,
+      venue: item.primary_location?.source?.display_name || 'OpenAlex Work',
+      publishedYear: item.publication_year,
+      url: item.id,
+      pdfUrl: item.open_access?.oa_url || undefined,
+      doi: item.doi
+    };
+    
+    return {
+      id: `openalex_${item.id.split('/').pop()}`,
+      title: item.title || 'Untitled OpenAlex Paper',
+      authors: item.authorships?.map((a: any) => a.author?.display_name) || ['Unknown Author'],
+      abstract,
+      metadata,
+      status: 'staged',
+      addedAt: Date.now()
+    };
+  });
+}
+
+// Fetch helper for CORE
+async function fetchCore(query: string, limit: number, apiKey?: string): Promise<DocumentSource[]> {
+  if (!apiKey) {
+    throw new Error('CORE API requires an API key in settings or environment variables.');
+  }
+  
+  const url = `https://api.core.ac.uk/v3/search/works?q=${encodeURIComponent(query)}&limit=${limit}`;
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+    next: { revalidate: 60 }
+  });
+  
+  if (!res.ok) throw new Error(`CORE API error: ${res.status}`);
+  const data = await res.json();
+  
+  return (data.results || []).map((item: any) => {
+    const metadata: PaperMetadata = {
+      citationCount: item.citationCount || 0,
+      venue: item.publisher || 'CORE Paper',
+      publishedYear: item.publishedDate ? parseInt(item.publishedDate.substring(0, 4)) : undefined,
+      url: item.downloadUrl || item.sourceFulltextUrls?.[0],
+      pdfUrl: item.downloadUrl || undefined,
+      doi: item.doi
+    };
+    
+    return {
+      id: `core_${item.id}`,
+      title: item.title || 'Untitled CORE Paper',
+      authors: item.authors?.map((a: any) => a.name) || ['Unknown Author'],
       abstract: item.abstract || '',
       metadata,
       status: 'staged',
