@@ -103,6 +103,8 @@ export async function GET(request: Request) {
                 's2k-IgaFq5lzt3YyD5IF0tSJRJSspaEHVhHWx4NzEY3y';
 
   const coreKey = request.headers.get('x-core-key') || process.env.CORE_API_KEY;
+  const openAlexKey = request.headers.get('x-openalex-key') || process.env.OPENALEX_API_KEY;
+  const pubMedKey = request.headers.get('x-pubmed-key') || process.env.PUBMED_API_KEY;
 
   if (!query) {
     return NextResponse.json({ error: 'Search query parameter "q" is required.' }, { status: 400 });
@@ -134,14 +136,14 @@ export async function GET(request: Request) {
     : Promise.resolve([]);
 
   const fetchPubMedPromise = (engine === 'all' || engine === 'pubmed')
-    ? fetchPubMed(normalizedQuery, limit).catch(err => {
+    ? fetchPubMed(normalizedQuery, limit, pubMedKey).catch(err => {
         console.error('PubMed Search Error:', err);
         return [];
       })
     : Promise.resolve([]);
 
   const fetchOpenAlexPromise = (engine === 'all' || engine === 'openalex')
-    ? fetchOpenAlex(normalizedQuery, limit).catch(err => {
+    ? fetchOpenAlex(normalizedQuery, limit, openAlexKey).catch(err => {
         console.error('OpenAlex Search Error:', err);
         return [];
       })
@@ -303,8 +305,9 @@ async function fetchSemanticScholarRaw(query: string, limit: number, apiKey?: st
 }
 
 // Fetch helper for PubMed
-async function fetchPubMed(query: string, limit: number): Promise<DocumentSource[]> {
-  const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=${limit}&retmode=json`;
+async function fetchPubMed(query: string, limit: number, apiKey?: string | null): Promise<DocumentSource[]> {
+  const apiKeyParam = apiKey ? `&api_key=${apiKey}` : '';
+  const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=${limit}&retmode=json${apiKeyParam}`;
   const searchRes = await fetch(searchUrl, { next: { revalidate: 60 } });
   if (!searchRes.ok) throw new Error(`PubMed Search error: ${searchRes.status}`);
   
@@ -312,7 +315,7 @@ async function fetchPubMed(query: string, limit: number): Promise<DocumentSource
   const ids = searchData.esearchresult?.idlist || [];
   if (ids.length === 0) return [];
 
-  const fetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${ids.join(',')}&retmode=xml`;
+  const fetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${ids.join(',')}&retmode=xml${apiKeyParam}`;
   const fetchRes = await fetch(fetchUrl, { next: { revalidate: 60 } });
   if (!fetchRes.ok) throw new Error(`PubMed Fetch error: ${fetchRes.status}`);
   
@@ -365,9 +368,9 @@ async function fetchPubMed(query: string, limit: number): Promise<DocumentSource
 }
 
 // Fetch helper for OpenAlex
-async function fetchOpenAlex(query: string, limit: number): Promise<DocumentSource[]> {
-  const mailto = 'mailto=research@example.com';
-  const url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=${limit}&${mailto}`;
+async function fetchOpenAlex(query: string, limit: number, apiKey?: string | null): Promise<DocumentSource[]> {
+  const apiKeyParam = apiKey ? `&api_key=${apiKey}` : '';
+  const url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=${limit}${apiKeyParam}`;
   const res = await fetch(url, { next: { revalidate: 60 } });
   if (!res.ok) throw new Error(`OpenAlex error: ${res.status}`);
   
