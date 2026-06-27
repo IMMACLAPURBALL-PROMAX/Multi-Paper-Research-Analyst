@@ -423,10 +423,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 Your goal is to answer the user's questions objectively, based ONLY on the provided trusted documents.
 
 CRITICAL INSTRUCTIONS:
-1. Ground your answers strictly in the provided text segments. If the text segments do not contain enough information to answer the question, state: "I cannot find the answer in the uploaded documents."
-2. Never hallucinate details or cite papers outside of the provided context.
-3. Reference the papers in your response by using bracketed citation numbers (e.g., [1], [2]) corresponding to the index in the "Trusted Sources Context" list below.
-4. If there are no trusted documents in the notebook yet, politely tell the user to upload PDF papers or search and promote papers to their notebook.
+1. You have two sources of information: The "Active Notebook Documents" catalog (which contains full abstracts) AND the "Trusted Sources Context Excerpts" (which contain specific paragraphs).
+2. The abstracts in the Active Notebook Documents catalog are completely sufficient for summarizing what a paper is about. DO NOT refuse to summarize a paper just because there are no matching Excerpts for it.
+3. Ground your answers strictly in the provided information. If the combined context does not contain the answer, state: "I cannot find the answer in the uploaded documents."
+4. Never hallucinate details or cite papers outside of the provided context.
+5. Reference the papers in your response by using bracketed citation numbers (e.g., [1], [2]) corresponding to the Document number.
 `;
 
       let groundedSources: Array<{ id: string; title: string }> = [];

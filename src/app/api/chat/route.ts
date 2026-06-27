@@ -380,7 +380,7 @@ export async function POST(request: Request) {
               systemInstruction += `\nExcerpt [${idx + 1}] (Source ID: ${c.document_id}):\n${c.content}\n`;
             });
             
-            systemInstruction += `\n\nCRITICAL GROUNDING CONSTRAINT: You must ONLY answer using the Trusted Sources Context Excerpts AND the Active Notebook Documents catalog provided above. If the combined context does not contain the answer to the user's question, state 'I cannot answer this based on the provided documents.' Do not hallucinate external information.`;
+            systemInstruction += `\n\nCRITICAL GROUNDING CONSTRAINT: You must ONLY answer using the Trusted Sources Context Excerpts AND the Active Notebook Documents catalog. The Active Notebook Documents catalog contains the full abstracts and is completely sufficient for summarizing papers. Do not refuse to summarize a document just because there are no matching Excerpts, as long as its abstract is in the catalog! If the combined context does not contain the answer, state 'I cannot answer this.'`;
           }
         }
       }
