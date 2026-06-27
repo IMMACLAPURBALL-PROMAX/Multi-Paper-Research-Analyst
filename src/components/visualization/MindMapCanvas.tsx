@@ -105,9 +105,28 @@ export const MindMapCanvas: React.FC = () => {
     if (apiKeys.openai) headers['x-openai-key'] = apiKeys.openai;
 
     // Create a corpus summary for the LLM
-    const corpusSummary = trustedSources.map((doc, idx) => 
-      `Paper [${idx + 1}]: "${doc.title}"\nAbstract: ${doc.abstract}\nAuthors: ${doc.authors.join(', ')}`
-    ).join('\n\n');
+    let corpusSummary = '';
+    for (let idx = 0; idx < trustedSources.length; idx++) {
+      const doc = trustedSources[idx];
+      let abstractText = doc.abstract;
+      
+      // Fallback: If abstract is empty or missing, fetch the first 3 chunks as a pseudo-abstract
+      if (!abstractText || abstractText.trim() === '') {
+        try {
+          const res = await fetch(`/api/chunks/${doc.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.chunks && data.chunks.length > 0) {
+              abstractText = data.chunks.slice(0, 3).map((c: any) => c.content).join('\n...\n');
+            }
+          }
+        } catch (e) {
+          console.error("Failed to fetch fallback chunks for", doc.title);
+        }
+      }
+      
+      corpusSummary += `Paper [${idx + 1}]: "${doc.title}"\nAbstract/Summary: ${abstractText || 'Not available'}\nAuthors: ${doc.authors.join(', ')}\n\n`;
+    }
 
     const prompt = `You are a research visualization expert. Analyze the following academic papers' abstracts and generate a highly detailed mind map representing the key connections, main themes, methodologies, and findings.
 
@@ -202,18 +221,18 @@ mindmap
         }
       }
 
-      const prompt = `You are an elite research visualization expert. You are being provided with the FULL TEXT chunks of multiple academic papers. Your task is to perform a deep synthesis and generate a massive, highly detailed Mermaid.js mind map connecting all the methodologies, datasets, key findings, and conclusions across these papers.
+      const prompt = `You are an elite research visualization expert. You are being provided with the FULL TEXT chunks of multiple academic papers. Your task is to perform a deep synthesis and generate a highly meaningful, directional Flowchart (graph LR) connecting the most critical insights, methodologies, and conclusions across these papers.
 
 Full Text Corpus:
 ${massiveContext}
 
 CRITICAL INSTRUCTIONS:
-1. Return the output strictly as a Mermaid.js mindmap syntax.
-2. The code block must start with "mindmap" on its own line.
-3. This is a DEEP SYNTHESIS. You must generate a very large map with at least 30-40 interconnected nodes branching out recursively. Do not skip details.
-4. Keep labels concise (1-5 words per node).
-5. Use standard indents (2 spaces per level) to define relationships.
-6. Do not include extra comments, markdown formatting, or HTML tags inside the mindmap block.
+1. Return the output strictly as Mermaid.js flowchart syntax starting with "graph LR".
+2. DO NOT use "mindmap" syntax.
+3. Create nodes that are descriptive, meaningful sentences or core findings (e.g., A["Helicopter parenting severely impacts autonomy"]). Do not use single-word meaningless nodes.
+4. Connect the nodes with descriptive action verbs (e.g., A -->|Leads to| B).
+5. Extract only the top 15-20 most critical, foundational relationships to keep the graph readable and profound.
+6. Do not include extra comments, markdown formatting, or HTML tags inside the block.
 7. Return ONLY the mermaid code block inside a \`\`\`mermaid codeblock.`;
 
       const response = await fetch('/api/chat', {
@@ -231,11 +250,15 @@ CRITICAL INSTRUCTIONS:
 
       const content = data.content;
       const mermaidMatch = content.match(/```mermaid\s*([\s\S]*?)\s*```/) || 
-                           content.match(/```\s*mindmap\s*([\s\S]*?)\s*```/) ||
+                           content.match(/```\s*graph\s*([\s\S]*?)\s*```/) ||
                            [null, content];
                            
       let extractedCode = mermaidMatch[1]?.trim() || content.trim();
-      if (!extractedCode.startsWith('mindmap')) extractedCode = 'mindmap\n' + extractedCode;
+      if (!extractedCode.startsWith('graph')) {
+        // If it starts with mindmap, replace it
+        extractedCode = extractedCode.replace(/^mindmap\n?/, '');
+        extractedCode = 'graph LR\n' + extractedCode;
+      }
       
       setMermaidCode(extractedCode);
     } catch (err: any) {

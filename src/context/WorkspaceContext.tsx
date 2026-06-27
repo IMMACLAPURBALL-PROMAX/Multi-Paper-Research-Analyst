@@ -349,6 +349,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     try {
       await deleteSource(id);
       await deletePdfFromLocal(id);
+      
+      // Delete chunks from Supabase
+      await fetch(`/api/chunks/${id}`, { method: 'DELETE' }).catch(err => console.error('Failed to delete Supabase chunks:', err));
+
       setStagedSources(prev => prev.filter(p => p.id !== id));
       setTrustedSources(prev => prev.filter(p => p.id !== id));
       if (activeStagedPaper?.id === id) {

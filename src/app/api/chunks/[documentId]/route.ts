@@ -33,3 +33,32 @@ export async function GET(
     return NextResponse.json({ error: err.message || 'Failed to fetch document chunks.' }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ documentId: string }> | { documentId: string } }
+) {
+  try {
+    const { documentId } = await params;
+    
+    if (!documentId) {
+      return NextResponse.json({ error: 'Missing documentId' }, { status: 400 });
+    }
+
+    const { error } = await supabase
+      .from('document_chunks')
+      .delete()
+      .eq('document_id', documentId);
+
+    if (error) {
+      console.error("Supabase delete error:", error);
+      throw new Error(`Failed to delete chunks: ${error.message}`);
+    }
+
+    return NextResponse.json({ success: true });
+
+  } catch (err: any) {
+    console.error('Chunks delete error:', err);
+    return NextResponse.json({ error: err.message || 'Failed to delete document chunks.' }, { status: 500 });
+  }
+}
