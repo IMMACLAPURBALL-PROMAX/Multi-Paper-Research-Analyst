@@ -131,6 +131,7 @@ export const MindMapCanvas: React.FC = () => {
     }
 
     const prompt = `You are a research visualization expert. Analyze the following academic papers' abstracts and generate a highly detailed mind map representing the key connections, main themes, methodologies, and findings.
+The full text/abstracts of the papers have already been provided to you below as plain text. Do not ask to read the PDF files or say you cannot access files. Read the text provided below.
 
 Papers:
 ${corpusSummary}
@@ -180,6 +181,9 @@ mindmap
                            [null, content];
                            
       let extractedCode = mermaidMatch[1]?.trim() || content.trim();
+      
+      // Clean up any lingering markdown code block markers
+      extractedCode = extractedCode.replace(/```mermaid/gi, '').replace(/```mindmap/gi, '').replace(/```/g, '').trim();
 
       // Ensure it starts with mindmap
       if (!extractedCode.startsWith('mindmap')) {
@@ -225,6 +229,7 @@ mindmap
       }
 
       const prompt = `You are an elite research visualization expert. You are being provided with the FULL TEXT chunks of multiple academic papers. Your task is to perform a deep synthesis and generate a highly meaningful, directional Flowchart (graph LR) connecting the most critical insights, methodologies, and conclusions across these papers.
+The full text of the papers have already been provided to you below as plain text. Do not ask to read the PDF files or say you cannot access files. Read the text provided below.
 
 Full Text Corpus:
 ${massiveContext}
@@ -257,10 +262,12 @@ CRITICAL INSTRUCTIONS:
                            [null, content];
                            
       let extractedCode = mermaidMatch[1]?.trim() || content.trim();
-      if (!extractedCode.startsWith('graph')) {
-        // If it starts with mindmap, replace it
-        extractedCode = extractedCode.replace(/^mindmap\n?/, '');
-        extractedCode = 'graph LR\n' + extractedCode;
+
+      // Clean up extracted code
+      extractedCode = extractedCode.replace(/```mermaid/gi, '').replace(/```graph/gi, '').replace(/```/g, '').trim();
+      
+      if (!extractedCode.startsWith('graph') && !extractedCode.startsWith('flowchart')) {
+        extractedCode = `graph LR\n${extractedCode}`;
       }
       
       setMermaidCode(extractedCode);
