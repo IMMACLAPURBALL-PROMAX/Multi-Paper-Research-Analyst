@@ -17,11 +17,12 @@ export const ResearchPanel: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchEngine, setSearchEngine] = useState<'all' | 'arxiv' | 'semanticscholar' | 'pubmed' | 'openalex' | 'core'>('all');
+  const [searchLimit, setSearchLimit] = useState<number>(12);
 
   const handleSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim() || isSearching) return;
-    await searchPapers(searchQuery, searchEngine);
+    await searchPapers(searchQuery, searchEngine, searchLimit);
   };
 
   return (
@@ -97,6 +98,20 @@ export const ResearchPanel: React.FC = () => {
             >
               CORE
             </button>
+          </div>
+          
+          <div className="limit-selector">
+            <label htmlFor="limit-slider">Max Results: <span>{searchLimit} Papers</span></label>
+            <input 
+              id="limit-slider"
+              type="range" 
+              min="10" 
+              max="100" 
+              step="5" 
+              value={searchLimit}
+              onChange={(e) => setSearchLimit(parseInt(e.target.value, 10))}
+              disabled={isSearching}
+            />
           </div>
         </form>
         {searchError && <p className="error-text">{searchError}</p>}
@@ -274,6 +289,35 @@ export const ResearchPanel: React.FC = () => {
           opacity: 0.5;
           cursor: not-allowed;
         }
+
+        .limit-selector {
+          margin-top: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .limit-selector label {
+          display: flex;
+          justify-content: space-between;
+          font-size: 10px;
+          font-weight: 600;
+          color: var(--text-secondary);
+          text-transform: uppercase;
+        }
+        .limit-selector label span {
+          color: var(--color-brand);
+          font-weight: 700;
+        }
+        .limit-selector input[type=range] {
+          width: 100%;
+          accent-color: var(--color-brand);
+          cursor: pointer;
+        }
+        .limit-selector input[type=range]:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
         .error-text {
           font-size: 11px;
           color: var(--color-danger);

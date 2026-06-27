@@ -34,7 +34,7 @@ interface WorkspaceContextProps {
   updateApiKeys: (keys: APIKeys) => void;
   updateModelConfig: (config: ModelConfig) => void;
   uploadPDF: (file: File) => Promise<void>;
-  searchPapers: (query: string, engine?: 'all' | 'arxiv' | 'semanticscholar' | 'pubmed' | 'openalex' | 'core') => Promise<DocumentSource[]>;
+  searchPapers: (query: string, engine?: 'all' | 'arxiv' | 'semanticscholar' | 'pubmed' | 'openalex' | 'core', limit?: number) => Promise<DocumentSource[]>;
   promotePaperToTrusted: (id: string) => Promise<void>;
   discardStagedPaper: (id: string) => Promise<void>;
   sendWorkspaceMessage: (text: string, image?: string) => Promise<void>;
@@ -281,7 +281,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   // 4. Academic Search
-  const searchPapers = async (query: string, engine: 'all' | 'arxiv' | 'semanticscholar' | 'pubmed' | 'openalex' | 'core' = 'all'): Promise<DocumentSource[]> => {
+  const searchPapers = async (query: string, engine: 'all' | 'arxiv' | 'semanticscholar' | 'pubmed' | 'openalex' | 'core' = 'all', limit: number = 12): Promise<DocumentSource[]> => {
     setIsSearching(true);
     setSearchError(null);
     try {
@@ -301,7 +301,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         headers['x-semanticscholar-key'] = apiKeys.semanticScholar;
       }
       
-      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=12&engine=${engine}`, {
+      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=${limit}&engine=${engine}`, {
         headers
       });
       

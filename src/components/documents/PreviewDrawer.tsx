@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useWorkspace } from '@/context/WorkspaceContext';
-import { Flame, Calendar, BookCheck, Trash2, Globe, X } from 'lucide-react';
+import { Flame, Calendar, BookCheck, Send, Trash2, Globe, FileText, X } from 'lucide-react';
+import { renderMarkdown } from '@/lib/markdown';
 
 export const PreviewDrawer: React.FC = () => {
   const {
@@ -10,13 +11,35 @@ export const PreviewDrawer: React.FC = () => {
     setActiveStagedPaper,
     promotePaperToTrusted,
     discardStagedPaper,
+    activeStagedChat,
+    sendStagedPaperMessage,
+    isChatting,
+    apiKeys,
+    modelConfig
   } = useWorkspace();
+
+  const [chatInput, setChatInput] = useState('');
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll staged chat
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [activeStagedChat, isChatting]);
 
   if (!activeStagedPaper) return null;
 
   const paper = activeStagedPaper;
   const isPromoted = paper.status === 'promoted';
 
+  const handleStagedChatSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isChatting) return;
+    const text = chatInput;
+    setChatInput('');
+    await sendStagedPaperMessage(paper.id, text);
+  };
+
+  const hasKeys = !!(apiKeys.gemini || apiKeys.claude || apiKeys.openai);
 
   return (
     <div className="preview-drawer animate-fade-in glass-panel">
@@ -97,7 +120,52 @@ export const PreviewDrawer: React.FC = () => {
           <p className="abstract-text">{paper.abstract || 'No abstract available.'}</p>
         </div>
 
+        {/* Isolated Staged RAG Chat */}
+        <div className="isolated-chat-section">
+          <h4>Ask this {isPromoted ? 'Notebook' : 'Staged'} Paper</h4>
+          <p className="chat-explanation">Answers draw only from this specific paper's abstract/content.</p>
+          
+          <div className="staged-chat-messages">
+            {activeStagedChat.length === 0 ? (
+              <div className="staged-chat-empty">
+                <FileText size={20} className="chat-icon" />
+                <span>No messages yet. Ask "What is the key finding?"</span>
+              </div>
+            ) : (
+              <div className="staged-messages-list">
+                {activeStagedChat.map((m) => (
+                  <div key={m.id} className={`staged-msg ${m.sender === 'user' ? 'user-msg' : 'ai-msg'}`}>
+                    <div className="msg-header">
+                      {m.sender === 'user' ? 'You' : `${modelConfig.provider.toUpperCase()}`}
+                    </div>
+                    <div className="staged-msg-content">{renderMarkdown(m.content)}</div>
+                  </div>
+                ))}
+                {isChatting && (
+                  <div className="staged-msg ai-msg thinking">
+                    <span className="dot"></span>
+                    <span className="dot"></span>
+                    <span className="dot"></span>
+                  </div>
+                )}
+                <div ref={chatBottomRef} />
+              </div>
+            )}
+          </div>
 
+          <form onSubmit={handleStagedChatSend} className="staged-chat-form">
+            <input
+              type="text"
+              placeholder={hasKeys ? "Ask about this paper..." : "Set API Keys to chat..."}
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              disabled={isChatting || !hasKeys}
+            />
+            <button type="submit" disabled={isChatting || !chatInput.trim() || !hasKeys}>
+              <Send size={12} />
+            </button>
+          </form>
+        </div>
       </div>
 
       <style jsx>{`
@@ -237,6 +305,113 @@ export const PreviewDrawer: React.FC = () => {
           text-decoration: underline;
         }
 
+        .isolated-chat-section {
+          background: rgba(148, 163, 184, 0.02);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-md);
+          padding: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .isolated-chat-section h4 {
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .chat-explanation {
+          font-size: 9px;
+          color: var(--text-muted);
+        }
+        .staged-chat-messages {
+          height: 160px;
+          overflow-y: auto;
+          background: rgba(10, 15, 29, 0.5);
+          border: 1px solid var(--border-color);
+          border-radius: var(--radius-sm);
+          padding: 8px;
+        }
+        .staged-chat-empty {
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          color: var(--text-muted);
+          font-size: 10px;
+          text-align: center;
+          gap: 4px;
+        }
+        .staged-messages-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .staged-msg {
+          padding: 6px 10px;
+          border-radius: var(--radius-sm);
+          font-size: 11px;
+          line-height: 1.4;
+        }
+        .staged-msg .msg-header {
+          font-size: 8px;
+          font-weight: 700;
+          text-transform: uppercase;
+          color: var(--text-muted);
+          margin-bottom: 2px;
+        }
+        .staged-msg.user-msg {
+          background: var(--color-brand-glow);
+          color: #e0e7ff;
+          align-self: flex-end;
+          border: 1px solid var(--border-color-glow);
+        }
+        .staged-msg.ai-msg {
+          background: rgba(148, 163, 184, 0.08);
+          color: var(--text-primary);
+          align-self: flex-start;
+          border: 1px solid var(--border-color);
+        }
+        
+        .thinking {
+          display: flex;
+          gap: 3px;
+          align-items: center;
+          padding: 8px;
+        }
+        .thinking .dot {
+          width: 4px;
+          height: 4px;
+          background: var(--text-muted);
+          border-radius: 50%;
+          animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .thinking .dot:nth-child(1) { animation-delay: -0.32s; }
+        .thinking .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        .staged-chat-form {
+          display: flex;
+          gap: 6px;
+          position: relative;
+        }
+        .staged-chat-form input {
+          flex-grow: 1;
+          height: 32px;
+          font-size: 11px;
+          padding-right: 32px;
+        }
+        .staged-chat-form button {
+          position: absolute;
+          right: 4px;
+          top: 4px;
+          width: 24px;
+          height: 24px;
+          background: var(--color-brand);
+          color: #fff;
+          border-radius: var(--radius-sm);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
 
         /* Promoted badge styling */
         .promoted-badge-box {

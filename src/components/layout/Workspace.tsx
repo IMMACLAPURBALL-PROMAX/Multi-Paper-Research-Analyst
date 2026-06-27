@@ -51,7 +51,6 @@ const InnerWorkspace: React.FC<{
           )}
         </div>
 
-        <PreviewDrawer />
       </div>
 
       {/* Center Column - Grounded Chat, Concept Canvas, or Document Viewer */}
@@ -59,6 +58,7 @@ const InnerWorkspace: React.FC<{
         {activeCenterTab === 'chat' && <MainChat />}
         {activeCenterTab === 'canvas' && <MindMapCanvas />}
         {activeCenterTab === 'viewer' && <DocumentViewer />}
+        <PreviewDrawer />
       </div>
 
       {/* Settings Modal */}
@@ -108,6 +108,7 @@ export const Workspace: React.FC = () => {
         
         .center-col {
           background: var(--bg-secondary);
+          position: relative;
         }
         
         .border-bottom {
