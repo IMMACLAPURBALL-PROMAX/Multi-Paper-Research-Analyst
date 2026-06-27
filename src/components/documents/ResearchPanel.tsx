@@ -239,20 +239,23 @@ export const ResearchPanel: React.FC = () => {
         
         .search-engine-selector {
           display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
           background: rgba(15, 23, 42, 0.4);
           border: 1px solid var(--border-color);
-          padding: 2px;
+          padding: 6px;
           border-radius: var(--radius-sm);
           margin-top: 8px;
         }
         .engine-btn {
-          flex: 1;
+          flex: 1 1 calc(33.33% - 4px);
+          min-width: 70px;
           background: transparent;
           border: none;
           color: var(--text-secondary);
-          padding: 4px 8px;
+          padding: 6px 8px;
           border-radius: calc(var(--radius-sm) - 2px);
-          font-size: 10px;
+          font-size: 11px;
           font-weight: 500;
           cursor: pointer;
           transition: all var(--transition-fast);

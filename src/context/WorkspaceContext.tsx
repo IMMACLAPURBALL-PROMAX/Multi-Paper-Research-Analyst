@@ -285,6 +285,17 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setIsSearching(true);
     setSearchError(null);
     try {
+      // Auto-clear previously staged papers
+      for (const paper of stagedSources) {
+        await deleteSource(paper.id).catch(() => {});
+        await deletePdfFromLocal(paper.id).catch(() => {});
+        await fetch(`/api/chunks/${paper.id}`, { method: 'DELETE' }).catch(() => {});
+      }
+      setStagedSources([]);
+      if (activeStagedPaper && stagedSources.some(p => p.id === activeStagedPaper.id)) {
+        setActiveStagedPaperState(null);
+      }
+
       const headers: Record<string, string> = {};
       if (apiKeys.semanticScholar) {
         headers['x-semanticscholar-key'] = apiKeys.semanticScholar;
