@@ -369,10 +369,17 @@ async function fetchPubMed(query: string, limit: number, apiKey?: string | null)
 
 // Fetch helper for OpenAlex
 async function fetchOpenAlex(query: string, limit: number, apiKey?: string | null): Promise<DocumentSource[]> {
-  const apiKeyParam = apiKey ? `&api_key=${apiKey}` : '';
-  const url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=${limit}${apiKeyParam}`;
+  let authParam = '';
+  if (apiKey) {
+    if (apiKey.includes('@')) {
+      authParam = `&mailto=${encodeURIComponent(apiKey.trim())}`;
+    } else {
+      authParam = `&api_key=${apiKey.trim()}`;
+    }
+  }
+  const url = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&per-page=${limit}${authParam}`;
   const res = await fetch(url, { next: { revalidate: 60 } });
-  if (!res.ok) throw new Error(`OpenAlex error: ${res.status}`);
+  if (!res.ok) throw new Error(`OpenAlex error: ${res.status} ${await res.text()}`);
   
   const data = await res.json();
   return (data.results || []).map((item: any) => {
