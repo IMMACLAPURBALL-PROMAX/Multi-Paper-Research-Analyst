@@ -186,6 +186,53 @@ export const DocumentViewer: React.FC = () => {
         </div>
       </div>
       )}
+
+      <style jsx>{`
+        .chat-header {
+          padding: 16px 20px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 1px solid var(--border-color);
+        }
+        .header-tabs-container {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .header-tabs {
+          display: flex;
+          background: rgba(15, 23, 42, 0.4);
+          border: 1px solid var(--border-color);
+          padding: 2px;
+          border-radius: var(--radius-md);
+        }
+        .header-tab-btn {
+          background: transparent;
+          border: none;
+          color: var(--text-secondary);
+          padding: 6px 14px;
+          border-radius: calc(var(--radius-md) - 2px);
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all var(--transition-fast);
+        }
+        .header-tab-btn:hover {
+          color: var(--text-primary);
+        }
+        .header-tab-btn.active {
+          background: var(--color-brand-glow);
+          border: 1px solid var(--border-color-glow);
+          color: #fff;
+          font-weight: 600;
+        }
+        .header-tab-desc {
+          font-size: 11px;
+          color: var(--text-muted);
+          font-weight: 500;
+        }
+      `}</style>
     </div>
   );
 };
