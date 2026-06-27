@@ -144,7 +144,11 @@ export const ResearchPanel: React.FC = () => {
               >
                 <div className="card-top-meta">
                   <span className="badge badge-muted">
-                    {paper.id.startsWith('arxiv_') ? 'arXiv' : 'Semantic Scholar'}
+                    {paper.id.startsWith('arxiv_') ? 'arXiv' 
+                      : paper.id.startsWith('pubmed_') ? 'PubMed' 
+                      : paper.id.startsWith('openalex_') ? 'OpenAlex' 
+                      : paper.id.startsWith('core_') ? 'CORE' 
+                      : 'Semantic Scholar'}
                   </span>
                   {paper.metadata.citationCount !== undefined && paper.metadata.citationCount > 0 && (
                     <span className="citation-count">
@@ -160,7 +164,7 @@ export const ResearchPanel: React.FC = () => {
                 <div className="card-bottom-meta">
                   <span className="date-tag">
                     <Calendar size={11} />
-                    {paper.metadata.publishedYear || 'Preprint'}
+                    {paper.metadata.publicationDate || paper.metadata.publishedYear || 'Preprint'}
                   </span>
                   <ChevronRight size={14} className="arrow-icon" />
                 </div>

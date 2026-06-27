@@ -304,8 +304,33 @@ async function fetchSemanticScholarRaw(query: string, limit: number, apiKey?: st
   });
 }
 
+let pubMedRequestQueue = Promise.resolve();
+let lastPubMedRequestTime = 0;
+
 // Fetch helper for PubMed
 async function fetchPubMed(query: string, limit: number, apiKey?: string | null): Promise<DocumentSource[]> {
+  return new Promise<DocumentSource[]>((resolve, reject) => {
+    pubMedRequestQueue = pubMedRequestQueue
+      .then(async () => {
+        try {
+          const now = Date.now();
+          const delayRequired = apiKey ? 150 : 400; // 10/s with key, 3/s without
+          const timeSinceLast = now - lastPubMedRequestTime;
+          if (timeSinceLast < delayRequired) {
+            await new Promise(r => setTimeout(r, delayRequired - timeSinceLast));
+          }
+          lastPubMedRequestTime = Date.now();
+          const res = await fetchPubMedRaw(query, limit, apiKey);
+          resolve(res);
+        } catch (err) {
+          reject(err);
+        }
+      })
+      .catch(reject);
+  });
+}
+
+async function fetchPubMedRaw(query: string, limit: number, apiKey?: string | null): Promise<DocumentSource[]> {
   const apiKeyParam = apiKey ? `&api_key=${apiKey}` : '';
   const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=${limit}&retmode=json${apiKeyParam}`;
   const searchRes = await fetch(searchUrl, { next: { revalidate: 60 } });
@@ -344,11 +369,18 @@ async function fetchPubMed(query: string, limit: number, apiKey?: string | null)
     }).filter(a => a);
 
     const yearMatch = article.match(/<PubDate>[\s\S]*?<Year>([\s\S]*?)<\/Year>[\s\S]*?<\/PubDate>/);
+    const monthMatch = article.match(/<PubDate>[\s\S]*?<Month>([\s\S]*?)<\/Month>[\s\S]*?<\/PubDate>/);
+    const pubDate = `${monthMatch ? cleanText(monthMatch[1]) : ''} ${yearMatch ? cleanText(yearMatch[1]) : ''}`.trim();
+    
+    const journalMatch = article.match(/<Journal>[\s\S]*?<Title>([\s\S]*?)<\/Title>[\s\S]*?<\/Journal>/);
+    const venue = journalMatch ? cleanText(journalMatch[1]) : 'PubMed';
+
     const doiMatch = article.match(/<ArticleId IdType="doi">([\s\S]*?)<\/ArticleId>/);
     
     const metadata: PaperMetadata = {
-      venue: 'PubMed',
-      publishedYear: yearMatch ? parseInt(yearMatch[1]) : undefined,
+      venue: venue,
+      publishedYear: yearMatch ? parseInt(cleanText(yearMatch[1])) : undefined,
+      publicationDate: pubDate || undefined,
       url: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
       doi: doiMatch ? cleanText(doiMatch[1]) : undefined,
       citationCount: 0
@@ -367,8 +399,32 @@ async function fetchPubMed(query: string, limit: number, apiKey?: string | null)
   return papers;
 }
 
+let openAlexRequestQueue = Promise.resolve();
+let lastOpenAlexRequestTime = 0;
+
 // Fetch helper for OpenAlex
 async function fetchOpenAlex(query: string, limit: number, apiKey?: string | null): Promise<DocumentSource[]> {
+  return new Promise<DocumentSource[]>((resolve, reject) => {
+    openAlexRequestQueue = openAlexRequestQueue
+      .then(async () => {
+        try {
+          const now = Date.now();
+          const timeSinceLast = now - lastOpenAlexRequestTime;
+          if (timeSinceLast < 150) { // 10 requests per second -> ~100ms
+            await new Promise(r => setTimeout(r, 150 - timeSinceLast));
+          }
+          lastOpenAlexRequestTime = Date.now();
+          const res = await fetchOpenAlexRaw(query, limit, apiKey);
+          resolve(res);
+        } catch (err) {
+          reject(err);
+        }
+      })
+      .catch(reject);
+  });
+}
+
+async function fetchOpenAlexRaw(query: string, limit: number, apiKey?: string | null): Promise<DocumentSource[]> {
   let authParam = '';
   if (apiKey) {
     if (apiKey.includes('@')) {
@@ -398,6 +454,7 @@ async function fetchOpenAlex(query: string, limit: number, apiKey?: string | nul
     const metadata: PaperMetadata = {
       citationCount: item.cited_by_count || 0,
       venue: item.primary_location?.source?.display_name || 'OpenAlex Work',
+      publicationDate: item.publication_date || undefined,
       publishedYear: item.publication_year,
       url: item.id,
       pdfUrl: item.open_access?.oa_url || undefined,
@@ -416,8 +473,32 @@ async function fetchOpenAlex(query: string, limit: number, apiKey?: string | nul
   });
 }
 
+let coreRequestQueue = Promise.resolve();
+let lastCoreRequestTime = 0;
+
 // Fetch helper for CORE
 async function fetchCore(query: string, limit: number, apiKey?: string): Promise<DocumentSource[]> {
+  return new Promise<DocumentSource[]>((resolve, reject) => {
+    coreRequestQueue = coreRequestQueue
+      .then(async () => {
+        try {
+          const now = Date.now();
+          const timeSinceLast = now - lastCoreRequestTime;
+          if (timeSinceLast < 200) { 
+            await new Promise(r => setTimeout(r, 200 - timeSinceLast));
+          }
+          lastCoreRequestTime = Date.now();
+          const res = await fetchCoreRaw(query, limit, apiKey);
+          resolve(res);
+        } catch (err) {
+          reject(err);
+        }
+      })
+      .catch(reject);
+  });
+}
+
+async function fetchCoreRaw(query: string, limit: number, apiKey?: string): Promise<DocumentSource[]> {
   if (!apiKey) {
     throw new Error('CORE API requires an API key in settings or environment variables.');
   }
@@ -434,7 +515,8 @@ async function fetchCore(query: string, limit: number, apiKey?: string): Promise
   return (data.results || []).map((item: any) => {
     const metadata: PaperMetadata = {
       citationCount: item.citationCount || 0,
-      venue: item.publisher || 'CORE Paper',
+      venue: item.publisher || item.journals?.[0]?.title || 'CORE Paper',
+      publicationDate: item.publishedDate || undefined,
       publishedYear: item.publishedDate ? parseInt(item.publishedDate.substring(0, 4)) : undefined,
       url: item.downloadUrl || item.sourceFulltextUrls?.[0],
       pdfUrl: item.downloadUrl || undefined,
