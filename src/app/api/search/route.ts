@@ -97,10 +97,8 @@ export async function GET(request: Request) {
   const query = searchParams.get('q');
   const limit = parseInt(searchParams.get('limit') || '10', 10);
   
-  // Read Semantic Scholar Key from headers, falling back to the developer key
-  const s2Key = request.headers.get('x-semanticscholar-key') || 
-                process.env.SEMANTIC_SCHOLAR_API_KEY || 
-                's2k-IgaFq5lzt3YyD5IF0tSJRJSspaEHVhHWx4NzEY3y';
+  // Read Semantic Scholar Key from headers, falling back to environment variable
+  const s2Key = request.headers.get('x-semanticscholar-key') || process.env.SEMANTIC_SCHOLAR_API_KEY;
 
   const coreKey = request.headers.get('x-core-key') || process.env.CORE_API_KEY;
   const openAlexKey = request.headers.get('x-openalex-key') || process.env.OPENALEX_API_KEY;
