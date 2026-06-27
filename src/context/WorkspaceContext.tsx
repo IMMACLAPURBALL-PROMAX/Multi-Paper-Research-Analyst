@@ -257,6 +257,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         authors,
         abstract: `Uploaded PDF file: ${file.name}. Size: ${(file.size / 1024 / 1024).toFixed(2)} MB.`,
         fullTextContent: markdown,
+        hasNoText: !markdown || markdown.trim().length === 0,
         chunks: [], // We no longer store chunks locally, they live in Supabase
         metadata: {
           url: '',
@@ -578,10 +579,10 @@ CRITICAL INSTRUCTIONS:
       
       const isPromoted = paper.status === 'promoted';
       const systemInstruction = `You are a research analyst reviewing a ${isPromoted ? 'promoted notebook' : 'staged (unverified)'} paper.
-Your goal is to answer questions ONLY about this specific paper: "${paper.title}".
+Your goal is to answer questions about this specific paper: "${paper.title}".
 
 CRITICAL INSTRUCTIONS:
-1. Ground your answers strictly in the document details provided below.
+1. Ground your answers in the document details provided below. You have web search capability enabled—feel free to search the internet for more details, findings, or explanations about this specific paper ("${paper.title}") if the details provided below are insufficient.
 ${isPromoted ? '' : '2. If the user asks general research questions, remind them that this paper is staged and they must promote it to the notebook to combine it with other sources.\n'}3. Be precise, objective, and cite only this document.
 
 Paper Details:
@@ -590,9 +591,8 @@ ${docContext}
 
       const currentStagedHistory = stagedChats[paperId] || [];
       const conversation = [...currentStagedHistory, userMsg].slice(-4);
-      const isScanned = !!paper.hasNoText;
 
-      const aiReply = await executeChatRequest(conversation, systemInstruction, isScanned, [paper.id]);
+      const aiReply = await executeChatRequest(conversation, systemInstruction, true, [paper.id]);
 
       const assistantMsg: ChatMessage = {
         id: `msg_${Date.now() + 1}`,

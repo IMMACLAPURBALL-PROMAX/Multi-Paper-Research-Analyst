@@ -364,13 +364,24 @@ export async function POST(request: Request) {
         let { data: topChunks, error } = await supabase.rpc('hybrid_search', {
           query_text: lastUserMsg.content,
           query_embedding: queryVector,
-          match_count: 50 // Fetch a deep pool to ensure we can find chunks for all active documents
+          match_count: 100 // Fetch a deeper pool to ensure we can find chunks for all active documents
         });
 
         if (error) {
           console.error("Supabase hybrid search failed:", error);
         } else if (topChunks && topChunks.length > 0) {
-          // Implement Balanced Per-Document Retrieval: Take the top 5 chunks for EACH active document
+          // Implement Balanced Dynamic Per-Document Retrieval:
+          // 1 paper -> 20 chunks
+          // 2-5 papers -> 12 chunks
+          // 6+ papers -> 5 chunks
+          const activeDocsCount = documentIds.length;
+          let chunkCap = 5;
+          if (activeDocsCount === 1) {
+            chunkCap = 20;
+          } else if (activeDocsCount <= 5) {
+            chunkCap = 12;
+          }
+
           let balancedChunks: any[] = [];
           const chunksByDoc: Record<string, any[]> = {};
           
@@ -381,8 +392,8 @@ export async function POST(request: Request) {
               chunksByDoc[c.document_id] = [];
             }
             
-            // Limit to 5 chunks per document
-            if (chunksByDoc[c.document_id].length < 5) {
+            // Limit to chunkCap chunks per document
+            if (chunksByDoc[c.document_id].length < chunkCap) {
               chunksByDoc[c.document_id].push(c);
               balancedChunks.push(c);
             }
