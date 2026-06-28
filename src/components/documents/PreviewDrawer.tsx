@@ -148,12 +148,21 @@ export const PreviewDrawer: React.FC = () => {
           </div>
 
           <form onSubmit={handleStagedChatSend} className="staged-chat-form">
-            <input
-              type="text"
-              placeholder={hasKeys ? "Ask about this paper..." : "Set API Keys to chat..."}
+            <textarea
+              rows={2}
+              placeholder={hasKeys ? "Ask about this paper...\n(Shift + Enter for new line)" : "Set API Keys to chat..."}
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (chatInput.trim() && !isChatting && hasKeys) {
+                    handleStagedChatSend(e as any);
+                  }
+                }
+              }}
               disabled={isChatting || !hasKeys}
+              style={{ resize: 'none', paddingTop: '10px' }}
             />
             <button type="submit" disabled={isChatting || !chatInput.trim() || !hasKeys}>
               <Send size={12} />
@@ -354,10 +363,10 @@ export const PreviewDrawer: React.FC = () => {
           margin-bottom: 2px;
         }
         .staged-msg.user-msg {
-          background: var(--color-brand-glow);
-          color: #e0e7ff;
+          background: var(--color-brand);
+          color: #fff;
           align-self: flex-end;
-          border: 1px solid var(--border-color-glow);
+          border: 1px solid var(--color-brand);
         }
         .staged-msg.ai-msg {
           background: rgba(148, 163, 184, 0.08);
@@ -387,16 +396,18 @@ export const PreviewDrawer: React.FC = () => {
           gap: 6px;
           position: relative;
         }
-        .staged-chat-form input {
+        .staged-chat-form textarea {
           flex-grow: 1;
-          height: 32px;
+          min-height: 52px;
           font-size: 11px;
           padding-right: 32px;
+          font-family: inherit;
+          line-height: 1.4;
         }
         .staged-chat-form button {
           position: absolute;
           right: 4px;
-          top: 4px;
+          bottom: 4px;
           width: 24px;
           height: 24px;
           background: var(--color-brand);
