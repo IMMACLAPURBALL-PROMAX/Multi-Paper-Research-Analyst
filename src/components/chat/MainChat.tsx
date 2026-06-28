@@ -636,7 +636,7 @@ export const MainChat: React.FC = () => {
         }
         .user-wrapper .message-bubble {
           background: var(--color-brand);
-          color: var(--text-primary);
+          color: #fff;
           border-bottom-right-radius: 4px;
           box-shadow: 0 4px 10px rgba(var(--color-brand-rgb), 0.2);
         }
@@ -714,7 +714,7 @@ export const MainChat: React.FC = () => {
         .input-area {
           padding: 16px 20px 20px;
           border-top: 1px solid var(--border-color);
-          background: var(--bg-surface);
+          background: var(--bg-secondary);
         }
         .input-form {
           display: flex;
@@ -733,7 +733,7 @@ export const MainChat: React.FC = () => {
           width: 28px;
           height: 28px;
           background: var(--color-brand);
-          color: var(--text-primary);
+          color: #fff;
           border-radius: var(--radius-sm);
           display: flex;
           align-items: center;
@@ -796,7 +796,7 @@ export const MainChat: React.FC = () => {
           width: 14px;
           height: 14px;
           background: rgba(0, 0, 0, 0.7);
-          color: var(--text-primary);
+          color: #fff;
           border-radius: 50%;
           display: flex;
           align-items: center;

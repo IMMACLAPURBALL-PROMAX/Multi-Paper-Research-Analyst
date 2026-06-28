@@ -229,7 +229,7 @@ export const PreviewDrawer: React.FC = () => {
         .btn-promote {
           flex-grow: 1;
           background: var(--color-brand);
-          color: var(--text-primary);
+          color: #fff;
           font-size: 12px;
           font-weight: 600;
           height: 36px;
@@ -286,7 +286,7 @@ export const PreviewDrawer: React.FC = () => {
           font-size: 13px;
           color: var(--text-secondary);
           line-height: 1.6;
-          background: var(--bg-surface);
+          background: var(--bg-secondary);
           padding: 12px;
           border-radius: var(--radius-sm);
           border: 1px solid rgba(148, 163, 184, 0.05);
@@ -325,7 +325,7 @@ export const PreviewDrawer: React.FC = () => {
           flex-grow: 1;
           min-height: 200px;
           overflow-y: auto;
-          background: var(--bg-surface);
+          background: var(--bg-secondary);
           border: 1px solid var(--border-color);
           border-radius: var(--radius-sm);
           padding: 12px;
@@ -406,7 +406,7 @@ export const PreviewDrawer: React.FC = () => {
           width: 24px;
           height: 24px;
           background: var(--color-brand);
-          color: var(--text-primary);
+          color: #fff;
           border-radius: var(--radius-sm);
           display: flex;
           align-items: center;

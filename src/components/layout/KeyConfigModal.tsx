@@ -531,7 +531,7 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
         .security-notice p {
           font-size: 13px;
           line-height: 1.5;
-          color: #c7d2fe;
+          color: var(--text-secondary);
         }
         .form-group {
           display: flex;
@@ -646,7 +646,7 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
         }
         .btn-verify:hover:not(:disabled) {
           background: var(--color-brand);
-          color: var(--text-primary);
+          color: #fff;
           border-color: var(--color-brand);
         }
         .btn-verify:disabled {

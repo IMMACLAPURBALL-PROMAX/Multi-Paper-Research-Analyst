@@ -197,7 +197,7 @@ export const ResearchPanel: React.FC = () => {
           display: flex;
           flex-direction: column;
           border-left: 1px solid var(--border-color);
-          background: var(--bg-surface);
+          background: var(--bg-secondary);
           position: relative;
         }
         .panel-header {
