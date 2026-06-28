@@ -439,7 +439,7 @@ export const ResearchPanel: React.FC = () => {
         .citation-count {
           font-size: 10px;
           font-weight: 600;
-          color: #fef08a;
+          color: var(--color-warning);
           display: flex;
           align-items: center;
           gap: 3px;

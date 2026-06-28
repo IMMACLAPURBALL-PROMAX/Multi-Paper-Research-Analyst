@@ -590,7 +590,7 @@ export const MainChat: React.FC = () => {
           padding: 10px 14px;
           border-radius: var(--radius-md);
           font-size: 11px;
-          color: #fef08a;
+          color: var(--color-warning);
         }
         .warning-icon {
           color: var(--color-warning);
