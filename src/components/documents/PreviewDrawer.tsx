@@ -148,21 +148,13 @@ export const PreviewDrawer: React.FC = () => {
           </div>
 
           <form onSubmit={handleStagedChatSend} className="staged-chat-form">
-            <textarea
-              rows={2}
-              placeholder={hasKeys ? "Ask about this paper...\n(Shift + Enter for new line)" : "Set API Keys to chat..."}
+            <input
+              type="text"
+              placeholder={hasKeys ? "Ask about this paper..." : "Set API Keys to chat..."}
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  if (chatInput.trim() && !isChatting && hasKeys) {
-                    handleStagedChatSend(e as any);
-                  }
-                }
-              }}
               disabled={isChatting || !hasKeys}
-              style={{ resize: 'none', paddingTop: '10px' }}
+              style={{ fontSize: '13px' }}
             />
             <button type="submit" disabled={isChatting || !chatInput.trim() || !hasKeys}>
               <Send size={12} />
@@ -396,18 +388,16 @@ export const PreviewDrawer: React.FC = () => {
           gap: 6px;
           position: relative;
         }
-        .staged-chat-form textarea {
+        .staged-chat-form input {
           flex-grow: 1;
-          min-height: 52px;
-          font-size: 11px;
+          height: 40px;
+          font-size: 13px;
           padding-right: 32px;
-          font-family: inherit;
-          line-height: 1.4;
         }
         .staged-chat-form button {
           position: absolute;
           right: 4px;
-          bottom: 4px;
+          top: 8px;
           width: 24px;
           height: 24px;
           background: var(--color-brand);

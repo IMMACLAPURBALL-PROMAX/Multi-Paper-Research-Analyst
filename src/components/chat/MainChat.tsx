@@ -352,27 +352,19 @@ export const MainChat: React.FC = () => {
             <Paperclip size={16} />
           </button>
 
-          <textarea
-            rows={3}
+          <input
+            type="text"
             placeholder={
               !hasKeys 
                 ? "Please configure your API keys first..."
                 : trustedSources.length === 0
                 ? "Add papers to your notebook to enable chat..."
-                : "Ask about your papers (or charts)...\n(Shift + Enter for new line)"
+                : "Ask about your papers (or charts)..."
             }
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                if ((input.trim() || attachedImage) && !isChatting && hasKeys && trustedSources.length > 0) {
-                  handleSend(e as any);
-                }
-              }
-            }}
             disabled={isChatting || !hasKeys || trustedSources.length === 0}
-            style={{ paddingLeft: '44px', paddingTop: '14px', resize: 'none' }}
+            style={{ paddingLeft: '44px', fontSize: '15px' }}
           />
           <button 
             type="submit" 
@@ -729,17 +721,15 @@ export const MainChat: React.FC = () => {
           gap: 10px;
           position: relative;
         }
-        .input-form textarea {
+        .input-form input {
           flex-grow: 1;
           padding-right: 48px;
-          min-height: 64px;
-          font-family: inherit;
-          line-height: 1.5;
+          height: 52px;
         }
         .btn-send {
           position: absolute;
           right: 8px;
-          bottom: 12px;
+          top: 12px;
           width: 28px;
           height: 28px;
           background: var(--color-brand);
@@ -825,7 +815,7 @@ export const MainChat: React.FC = () => {
         .btn-attach {
           position: absolute;
           left: 10px;
-          bottom: 14px;
+          top: 14px;
           width: 24px;
           height: 24px;
           display: flex;
