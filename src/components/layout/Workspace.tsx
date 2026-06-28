@@ -40,17 +40,6 @@ const InnerWorkspace: React.FC<{
             <Sparkles size={14} />
             <span>Research Mode</span>
           </button>
-          
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
-            <button 
-              className="tab-btn icon-only" 
-              onClick={() => updateMode(activeMode === 'light' ? 'dark' : 'light')}
-              title={`Switch to ${activeMode === 'light' ? 'Dark' : 'Light'} Mode`}
-              style={{ padding: '0 8px', borderRadius: 'var(--radius-full)' }}
-            >
-              {activeMode === 'light' ? <Moon size={14} /> : <Sun size={14} />}
-            </button>
-          </div>
         </div>
 
         {/* Active Panel Display */}
@@ -113,7 +102,7 @@ export const Workspace: React.FC = () => {
         
         .left-col {
           border-right: 1px solid var(--border-color);
-          background: rgba(10, 15, 29, 0.5);
+          background: var(--bg-secondary);
           position: relative;
         }
         
@@ -130,7 +119,7 @@ export const Workspace: React.FC = () => {
         .column-tabs {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          background: rgba(15, 23, 42, 0.8);
+          background: var(--bg-glass);
           padding: 4px;
         }
         

@@ -506,7 +506,7 @@ export const MainChat: React.FC = () => {
           display: flex;
           align-items: center;
           gap: 6px;
-          background: rgba(15, 23, 42, 0.4);
+          background: var(--bg-glass);
           border: 1px solid var(--border-color);
           padding: 4px 8px;
           border-radius: var(--radius-sm);
@@ -769,7 +769,7 @@ export const MainChat: React.FC = () => {
           display: flex;
           align-items: center;
           gap: 10px;
-          background: rgba(15, 23, 42, 0.6);
+          background: var(--bg-glass);
           border: 1px solid var(--border-color);
           border-bottom: none;
           padding: 8px 12px;
@@ -858,7 +858,7 @@ export const MainChat: React.FC = () => {
         }
         .header-tabs {
           display: flex;
-          background: rgba(15, 23, 42, 0.4);
+          background: var(--bg-glass);
           border: 1px solid var(--border-color);
           padding: 2px;
           border-radius: var(--radius-md);
@@ -956,7 +956,7 @@ export const MainChat: React.FC = () => {
           margin-top: 16px;
           display: flex;
           gap: 8px;
-          background: rgba(15, 23, 42, 0.85);
+          background: var(--bg-glass);
           backdrop-filter: blur(8px);
           border: 1px solid var(--border-color);
           padding: 6px;

@@ -256,7 +256,7 @@ export const ResearchPanel: React.FC = () => {
           display: flex;
           flex-wrap: wrap;
           gap: 4px;
-          background: rgba(15, 23, 42, 0.4);
+          background: var(--bg-glass);
           border: 1px solid var(--border-color);
           padding: 6px;
           border-radius: var(--radius-sm);
@@ -413,7 +413,7 @@ export const ResearchPanel: React.FC = () => {
           padding-right: 2px;
         }
         .staged-card {
-          background: rgba(15, 23, 42, 0.3);
+          background: var(--bg-glass);
           border: 1px solid var(--border-color);
           border-radius: var(--radius-md);
           padding: 12px;

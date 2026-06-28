@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useWorkspace } from '@/context/WorkspaceContext';
-import { Settings, X, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Settings, X, Eye, EyeOff, ShieldCheck, Sun, Moon } from 'lucide-react';
 import { getAvailableModels } from '@/lib/models';
 
 interface KeyConfigModalProps {
@@ -27,7 +27,9 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
     updateApiKeys, 
     updateModelConfig,
     activeTheme,
-    updateTheme
+    updateTheme,
+    activeMode,
+    updateMode
   } = useWorkspace();
   
   const [geminiKey, setGeminiKey] = useState(apiKeys.gemini || '');
@@ -365,9 +367,43 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
           </div> {/* Closes Configure API Keys form-group */}
 
           <div className="form-group">
-            <h3>3. Accent Theme</h3>
-            <p className="subtitle">Select your preferred accent color for the workspace.</p>
-            <div className="theme-selectors-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '6px' }}>
+            <h3>3. Workspace Theme</h3>
+            <p className="subtitle">Select your preferred lighting mode and accent color.</p>
+            
+            <div className="mode-toggle-row" style={{ display: 'flex', gap: '8px', marginBottom: '16px', marginTop: '12px' }}>
+              <button
+                type="button"
+                className={`theme-dot-btn ${activeMode === 'dark' ? 'active' : ''}`}
+                onClick={() => updateMode('dark')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  border: activeMode === 'dark' ? '1px solid var(--color-brand)' : '1px solid var(--border-color)',
+                  background: activeMode === 'dark' ? 'var(--color-brand-glow)' : 'var(--bg-glass)',
+                  color: activeMode === 'dark' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'all var(--transition-fast)'
+                }}
+              >
+                <Moon size={14} /> Dark Mode
+              </button>
+              <button
+                type="button"
+                className={`theme-dot-btn ${activeMode === 'light' ? 'active' : ''}`}
+                onClick={() => updateMode('light')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  border: activeMode === 'light' ? '1px solid var(--color-brand)' : '1px solid var(--border-color)',
+                  background: activeMode === 'light' ? 'var(--color-brand-glow)' : 'var(--bg-glass)',
+                  color: activeMode === 'light' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  fontSize: '12px', fontWeight: 600, cursor: 'pointer', transition: 'all var(--transition-fast)'
+                }}
+              >
+                <Sun size={14} /> Light Mode
+              </button>
+            </div>
+
+            <div className="theme-selectors-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               {Object.entries(THEMES).map(([name, themeInfo]) => (
                 <button
                   key={name}
@@ -381,7 +417,7 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
                     padding: '8px 14px',
                     borderRadius: 'var(--radius-md)',
                     border: activeTheme === name ? '1px solid var(--color-brand)' : '1px solid var(--border-color)',
-                    background: activeTheme === name ? 'var(--color-brand-glow)' : 'rgba(15, 23, 42, 0.4)',
+                    background: activeTheme === name ? 'var(--color-brand-glow)' : 'var(--bg-glass)',
                     color: activeTheme === name ? 'var(--text-primary)' : 'var(--text-secondary)',
                     fontSize: '12px',
                     fontWeight: 600,

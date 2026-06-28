@@ -371,7 +371,7 @@ export const TrustedPanel: React.FC<TrustedPanelProps> = ({ onOpenSettings }) =>
           padding-right: 2px;
         }
         .source-item {
-          background: rgba(15, 23, 42, 0.4);
+          background: var(--bg-glass);
           border: 1px solid var(--border-color);
           padding: 10px 12px;
           border-radius: var(--radius-md);

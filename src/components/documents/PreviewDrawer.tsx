@@ -259,7 +259,7 @@ export const PreviewDrawer: React.FC = () => {
         }
 
         .paper-details-section {
-          background: rgba(15, 23, 42, 0.3);
+          background: var(--bg-glass);
           border: 1px solid var(--border-color);
           border-radius: var(--radius-md);
           padding: 12px;

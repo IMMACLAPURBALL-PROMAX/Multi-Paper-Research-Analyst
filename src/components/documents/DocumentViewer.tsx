@@ -152,7 +152,7 @@ export const DocumentViewer: React.FC = () => {
           
           {!loading && !error && chunks.map((chunk, index) => (
             <div key={chunk.id} style={{
-              background: 'rgba(15, 23, 42, 0.6)',
+              background: 'var(--bg-glass)',
               border: '1px solid rgba(99, 102, 241, 0.2)',
               borderRadius: 'var(--radius-md)',
               padding: '20px',
@@ -195,7 +195,7 @@ export const DocumentViewer: React.FC = () => {
         }
         .header-tabs {
           display: flex;
-          background: rgba(15, 23, 42, 0.4);
+          background: var(--bg-glass);
           border: 1px solid var(--border-color);
           padding: 2px;
           border-radius: var(--radius-md);

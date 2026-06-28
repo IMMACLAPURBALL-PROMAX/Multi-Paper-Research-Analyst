@@ -559,7 +559,7 @@ CRITICAL INSTRUCTIONS:
         }
         .header-tabs {
           display: flex;
-          background: rgba(15, 23, 42, 0.4);
+          background: var(--bg-glass);
           border: 1px solid var(--border-color);
           padding: 2px;
           border-radius: var(--radius-md);
@@ -596,7 +596,7 @@ CRITICAL INSTRUCTIONS:
           right: 16px;
           display: flex;
           gap: 6px;
-          background: rgba(15, 23, 42, 0.85);
+          background: var(--bg-glass);
           backdrop-filter: blur(8px);
           border: 1px solid var(--border-color);
           padding: 4px;
