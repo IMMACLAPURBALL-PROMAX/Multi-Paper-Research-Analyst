@@ -72,16 +72,10 @@ export const PreviewDrawer: React.FC = () => {
           {isPromoted ? (
             <div className="promoted-badge-box">
               <BookCheck size={14} className="check-icon" />
-              <span>Promoted to Notebook</span>
+              <span>Notebook Source</span>
             </div>
           ) : (
-            <button 
-              className="btn-promote" 
-              onClick={() => promotePaperToTrusted(paper.id)}
-            >
-              <BookCheck size={14} />
-              <span>Promote to Notebook</span>
-            </button>
+            <div style={{ flexGrow: 1 }} />
           )}
           
           <button 

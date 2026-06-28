@@ -112,8 +112,7 @@ export const TrustedPanel: React.FC<TrustedPanelProps> = ({ onOpenSettings }) =>
         {trustedSources.length === 0 ? (
           <div className="empty-sources-state">
             <FileText className="empty-icon" size={32} />
-            <p>Your notebook is empty.</p>
-            <p className="hint">Upload a local PDF or search papers in Research Mode and promote them here.</p>
+            <p className="hint">Upload a local PDF to begin.</p>
           </div>
         ) : (
           <div className="sources-scroll">

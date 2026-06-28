@@ -146,8 +146,7 @@ export const ResearchPanel: React.FC = () => {
         {!isSearching && stagedSources.length === 0 ? (
           <div className="empty-staging-state">
             <Search size={24} className="empty-icon" />
-            <p>Staging area is empty</p>
-            <p className="hint">Run a search above to pull papers. They won't affect your notebook chat until promoted.</p>
+            <p className="hint">Run a search above to pull papers and explore abstracts.</p>
           </div>
         ) : (
           <div className="staged-scroll-list">
