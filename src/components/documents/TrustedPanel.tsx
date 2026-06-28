@@ -160,7 +160,7 @@ export const TrustedPanel: React.FC<TrustedPanelProps> = ({ onOpenSettings }) =>
           display: flex;
           flex-direction: column;
           border-right: 1px solid var(--border-color);
-          background: rgba(10, 15, 29, 0.4);
+          background: var(--bg-surface);
         }
         .panel-header {
           padding: 20px 20px 14px;
@@ -267,7 +267,7 @@ export const TrustedPanel: React.FC<TrustedPanelProps> = ({ onOpenSettings }) =>
           gap: 8px;
           padding: 10px;
           background: var(--color-brand);
-          color: #fff;
+          color: var(--text-primary);
           font-weight: 500;
           font-size: 13px;
           border-radius: var(--radius-md);

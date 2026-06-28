@@ -144,7 +144,7 @@ export const Workspace: React.FC = () => {
         }
         
         .tab-btn.active {
-          color: #fff;
+          color: var(--text-primary);
           background: var(--color-brand-glow);
           border: 1px solid var(--border-color-glow);
         }

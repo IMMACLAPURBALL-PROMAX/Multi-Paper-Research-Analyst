@@ -217,7 +217,7 @@ export const DocumentViewer: React.FC = () => {
         .header-tab-btn.active {
           background: var(--color-brand-glow);
           border: 1px solid var(--border-color-glow);
-          color: #fff;
+          color: var(--text-primary);
           font-weight: 600;
         }
         .header-tab-desc {

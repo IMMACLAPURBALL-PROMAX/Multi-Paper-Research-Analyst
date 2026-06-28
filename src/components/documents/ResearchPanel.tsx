@@ -197,7 +197,7 @@ export const ResearchPanel: React.FC = () => {
           display: flex;
           flex-direction: column;
           border-left: 1px solid var(--border-color);
-          background: rgba(10, 15, 29, 0.4);
+          background: var(--bg-surface);
           position: relative;
         }
         .panel-header {
@@ -282,7 +282,7 @@ export const ResearchPanel: React.FC = () => {
         .engine-btn.active {
           background: var(--color-brand-glow);
           border: 1px solid var(--border-color-glow);
-          color: #fff;
+          color: var(--text-primary);
           font-weight: 600;
         }
         .engine-btn:disabled {

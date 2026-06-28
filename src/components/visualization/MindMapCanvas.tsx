@@ -15,7 +15,8 @@ export const MindMapCanvas: React.FC = () => {
     apiKeys, 
     modelConfig,
     activeCenterTab,
-    setActiveCenterTab
+    setActiveCenterTab,
+    activeMode
   } = useWorkspace();
   const [mermaidCode, setMermaidCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -39,22 +40,23 @@ export const MindMapCanvas: React.FC = () => {
   // Initialize Mermaid on mount
   useEffect(() => {
     try {
+      const isLight = activeMode === 'light';
       mermaid.initialize({
         startOnLoad: false,
-        theme: 'dark',
+        theme: isLight ? 'default' : 'dark',
         securityLevel: 'loose',
         themeVariables: {
-          background: '#0f172a',
+          background: isLight ? '#f8fafc' : '#0f172a',
           primaryColor: '#6366f1',
-          primaryTextColor: '#f8fafc',
-          lineColor: '#64748b',
+          primaryTextColor: isLight ? '#0f172a' : '#f8fafc',
+          lineColor: isLight ? '#94a3b8' : '#64748b',
           fontSize: '13px'
         }
       });
     } catch (err) {
       console.error('Failed to initialize Mermaid:', err);
     }
-  }, []);
+  }, [activeMode]);
 
   // Render SVG when mermaidCode changes
   useEffect(() => {
@@ -233,8 +235,8 @@ CRITICAL INSTRUCTIONS:
       
       if (ctx) {
         ctx.scale(scale, scale);
-        // Fill dark background to match the theme
-        ctx.fillStyle = '#0f172a';
+        // Fill background to match the theme
+        ctx.fillStyle = activeMode === 'light' ? '#f8fafc' : '#0f172a';
         ctx.fillRect(0, 0, baseWidth, baseHeight);
         ctx.drawImage(img, 0, 0, baseWidth, baseHeight);
         
@@ -406,7 +408,7 @@ CRITICAL INSTRUCTIONS:
           height: 100%;
           display: flex;
           flex-direction: column;
-          background: rgba(10, 15, 29, 0.25);
+          background: var(--bg-surface);
         }
         .canvas-header {
           padding: 16px;
@@ -459,7 +461,7 @@ CRITICAL INSTRUCTIONS:
           justify-content: center;
           position: relative;
           overflow: hidden;
-          background: #080c16;
+          background: var(--bg-primary);
         }
         
         .canvas-loading {
@@ -581,7 +583,7 @@ CRITICAL INSTRUCTIONS:
         .header-tab-btn.active {
           background: var(--color-brand-glow);
           border: 1px solid var(--border-color-glow);
-          color: #fff;
+          color: var(--text-primary);
           font-weight: 600;
         }
         .header-tab-desc {

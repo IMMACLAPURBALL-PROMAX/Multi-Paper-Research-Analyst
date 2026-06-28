@@ -646,7 +646,7 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
         }
         .btn-verify:hover:not(:disabled) {
           background: var(--color-brand);
-          color: #fff;
+          color: var(--text-primary);
           border-color: var(--color-brand);
         }
         .btn-verify:disabled {
@@ -677,7 +677,7 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
           max-width: 320px;
           text-align: center;
           box-shadow: var(--shadow-lg), var(--shadow-glow);
-          background: #0b0f19;
+          background: var(--bg-secondary);
           border: 1px solid var(--border-color);
         }
         .buffer-loop {
@@ -697,7 +697,7 @@ export const KeyConfigModal: React.FC<KeyConfigModalProps> = ({ isOpen, onClose 
           gap: 12px;
           padding: 16px 24px;
           border-top: 1px solid var(--border-color);
-          background: rgba(10, 15, 29, 0.5);
+          background: var(--bg-surface);
         }
       `}</style>
       

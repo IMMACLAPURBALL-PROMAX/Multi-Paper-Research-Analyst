@@ -141,7 +141,7 @@ html, body {
 
 /* Common form elements styles */
 input, select, textarea {
-  background: rgba(15, 23, 42, 0.8);
+  background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   color: var(--text-primary);
