@@ -21,9 +21,19 @@ export const MindMapCanvas: React.FC = () => {
   const [isDeepLoading, setIsDeepLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
-  const [targetPdfId, setTargetPdfId] = useState<string>('all');
+  const [targetPdfId, setTargetPdfId] = useState<string>('');
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0 });
   
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Auto-select first trusted source if target is empty
+  useEffect(() => {
+    if ((!targetPdfId || targetPdfId === 'all') && trustedSources.length > 0) {
+      setTargetPdfId(trustedSources[0].id);
+    }
+  }, [trustedSources, targetPdfId]);
 
   // Initialize Mermaid on mount
   useEffect(() => {
@@ -141,9 +151,10 @@ CRITICAL INSTRUCTIONS:
 2. The code block must start with "mindmap" on its own line.
 3. DO NOT CREATE A SIMPLISTIC 4-BRANCH MAP. You MUST break down the concepts deeply. Create at least 15-20 distinct nodes branching out from the root.
 4. Keep labels short and concise (1-4 words per node).
-5. Use standard indents (2 spaces per level) to define relationships.
-6. Do not include extra comments, markdown formatting, or HTML tags inside the mindmap block.
-6. Return ONLY the mermaid code block inside a \`\`\`mermaid codeblock.
+5. If the provided abstract text is extremely short or lacks sufficient detail, DO NOT hallucinate or use outside knowledge. Generate a single node that says "Insufficient Data for Mindmap".
+6. Use standard indents (2 spaces per level) to define relationships.
+7. Do not include extra comments, markdown formatting, or HTML tags inside the mindmap block.
+8. Return ONLY the mermaid code block inside a \`\`\`mermaid codeblock.
 
 Example output format:
 \`\`\`mermaid
@@ -282,6 +293,41 @@ CRITICAL INSTRUCTIONS:
 
   const hasKeys = !!(apiKeys.gemini || apiKeys.claude || apiKeys.openai);
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    dragStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setPan({
+      x: e.clientX - dragStart.current.x,
+      y: e.clientY - dragStart.current.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleDownloadSvg = () => {
+    if (!canvasRef.current) return;
+    const svgEl = canvasRef.current.querySelector('svg');
+    if (!svgEl) return;
+    
+    const svgData = new XMLSerializer().serializeToString(svgEl);
+    const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `mindmap-${Date.now()}.svg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="mindmap-container glass-panel">
       {/* 1. Header Row */}
@@ -321,16 +367,15 @@ CRITICAL INSTRUCTIONS:
               style={{
                 background: 'rgba(15, 23, 42, 0.4)',
                 border: '1px solid var(--border-color)',
-                color: 'var(--text-secondary)',
+                color: 'var(--text-primary)',
                 padding: '6px 10px',
                 borderRadius: 'var(--radius-md)',
                 fontSize: '12px',
                 outline: 'none'
               }}
             >
-              <option value="all">All PDFs</option>
               {trustedSources.map(doc => (
-                <option key={doc.id} value={doc.id}>
+                <option key={doc.id} value={doc.id} style={{ background: '#0f172a', color: '#fff' }}>
                   {doc.title.length > 25 ? doc.title.substring(0, 25) + '...' : doc.title}
                 </option>
               ))}
@@ -402,15 +447,22 @@ CRITICAL INSTRUCTIONS:
         )}
 
         {!isLoading && !error && mermaidCode && (
-          <div className="canvas-viewport">
+          <div 
+            className="canvas-viewport"
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+          >
             {/* The Render Target */}
             <div 
               ref={canvasRef} 
               className="mermaid-render-target" 
               style={{
-                transform: `scale(${zoomLevel})`,
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
                 transformOrigin: 'center center',
-                transition: 'transform 0.15s ease-out',
+                transition: isDragging ? 'none' : 'transform 0.15s ease-out',
                 display: 'inline-block',
                 margin: 'auto'
               }}
@@ -424,10 +476,10 @@ CRITICAL INSTRUCTIONS:
               <button onClick={() => setZoomLevel(z => Math.max(z - 0.15, 0.4))} title="Zoom Out">
                 <ZoomOut size={14} />
               </button>
-              <button onClick={() => setZoomLevel(1)} title="Reset Zoom">
+              <button onClick={() => { setZoomLevel(1); setPan({x:0, y:0}); }} title="Reset Zoom">
                 <Maximize2 size={14} />
               </button>
-              <button onClick={() => window.print()} title="Print / Export PDF">
+              <button onClick={handleDownloadSvg} title="Download SVG">
                 <Download size={14} />
               </button>
               <button onClick={() => setMermaidCode('')} title="Reset Canvas">
