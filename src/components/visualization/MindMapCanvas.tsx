@@ -209,7 +209,16 @@ CRITICAL INSTRUCTIONS:
     const svgEl = canvasRef.current.querySelector('svg');
     if (!svgEl) return;
     
-    const svgData = new XMLSerializer().serializeToString(svgEl);
+    // Clone the SVG so we don't mess up the live UI
+    const clone = svgEl.cloneNode(true) as SVGSVGElement;
+    
+    // Strip restrictive inline styles that prevent zooming in external viewers
+    clone.removeAttribute('style');
+    clone.removeAttribute('width');
+    clone.removeAttribute('height');
+    // Ensure viewBox is preserved so it scales intrinsically
+    
+    const svgData = new XMLSerializer().serializeToString(clone);
     const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     
