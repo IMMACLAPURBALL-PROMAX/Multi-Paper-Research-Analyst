@@ -9,7 +9,7 @@ import { MainChat } from '@/components/chat/MainChat';
 import { MindMapCanvas } from '@/components/visualization/MindMapCanvas';
 import { DocumentViewer } from '@/components/documents/DocumentViewer';
 import { KeyConfigModal } from '@/components/layout/KeyConfigModal';
-import { BookOpen, Sparkles } from 'lucide-react';
+import { BookOpen, Sparkles, Sun, Moon } from 'lucide-react';
 
 const InnerWorkspace: React.FC<{
   activeLeftTab: 'notebook' | 'research';
@@ -17,7 +17,7 @@ const InnerWorkspace: React.FC<{
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
 }> = ({ activeLeftTab, setActiveLeftTab, isSettingsOpen, setIsSettingsOpen }) => {
-  const { activeCenterTab } = useWorkspace();
+  const { activeCenterTab, activeMode, updateMode } = useWorkspace();
 
   return (
     <div className="workspace-container">
@@ -40,6 +40,17 @@ const InnerWorkspace: React.FC<{
             <Sparkles size={14} />
             <span>Research Mode</span>
           </button>
+          
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+            <button 
+              className="tab-btn icon-only" 
+              onClick={() => updateMode(activeMode === 'light' ? 'dark' : 'light')}
+              title={`Switch to ${activeMode === 'light' ? 'Dark' : 'Light'} Mode`}
+              style={{ padding: '0 8px', borderRadius: 'var(--radius-full)' }}
+            >
+              {activeMode === 'light' ? <Moon size={14} /> : <Sun size={14} />}
+            </button>
+          </div>
         </div>
 
         {/* Active Panel Display */}
@@ -147,12 +158,6 @@ export const Workspace: React.FC = () => {
           color: #fff;
           background: var(--color-brand-glow);
           border: 1px solid var(--border-color-glow);
-        }
-        
-        .tab-btn-research.active {
-          color: #fff;
-          background: rgba(245, 158, 11, 0.12);
-          border-color: rgba(245, 158, 11, 0.25);
         }
         
         .active-panel-container {

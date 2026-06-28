@@ -48,6 +48,8 @@ interface WorkspaceContextProps {
   setIsInlineViewerOpen: (open: boolean) => void;
   activeTheme: 'purple' | 'coral' | 'amber' | 'teal' | 'plains';
   updateTheme: (theme: 'purple' | 'coral' | 'amber' | 'teal' | 'plains') => void;
+  activeMode: 'dark' | 'light';
+  updateMode: (mode: 'dark' | 'light') => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextProps | undefined>(undefined);
@@ -83,6 +85,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [selectedViewerDocId, setSelectedViewerDocId] = useState<string | null>(null);
   const [isInlineViewerOpen, setIsInlineViewerOpen] = useState<boolean>(false);
   const [activeTheme, setActiveTheme] = useState<'purple' | 'coral' | 'amber' | 'teal' | 'plains'>('purple');
+  const [activeMode, setActiveMode] = useState<'dark' | 'light'>('dark');
 
   // Load cached theme from localStorage on mount
   useEffect(() => {
@@ -90,17 +93,40 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (cachedTheme) {
       setActiveTheme(cachedTheme as any);
     }
+    const cachedMode = localStorage.getItem('workspace_mode');
+    if (cachedMode) {
+      setActiveMode(cachedMode as any);
+    }
   }, []);
 
   // Sync theme css variables to document root
   useEffect(() => {
     const root = document.documentElement;
+    root.setAttribute('data-theme', activeMode);
+    if (activeMode === 'light') {
+      document.body.classList.add('light-mode');
+    } else {
+      document.body.classList.remove('light-mode');
+    }
+    
+    const isLight = activeMode === 'light';
+    
     const colors = {
-      purple: { brand: '#6366f1', hover: '#4f46e5', rgb: '99, 102, 241', glow: 'rgba(99, 102, 241, 0.15)', borderGlow: 'rgba(99, 102, 241, 0.25)' },
-      coral: { brand: '#FF6B6B', hover: '#FF5252', rgb: '255, 107, 107', glow: 'rgba(255, 107, 107, 0.15)', borderGlow: 'rgba(255, 107, 107, 0.25)' },
-      amber: { brand: '#FFC300', hover: '#E6B000', rgb: '255, 195, 0', glow: 'rgba(255, 195, 0, 0.15)', borderGlow: 'rgba(255, 195, 0, 0.25)' },
-      teal: { brand: '#2EC4B6', hover: '#259E92', rgb: '46, 196, 182', glow: 'rgba(46, 196, 182, 0.15)', borderGlow: 'rgba(46, 196, 182, 0.25)' },
-      plains: { brand: '#A9DFBF', hover: '#8FD4A8', rgb: '169, 223, 191', glow: 'rgba(169, 223, 191, 0.15)', borderGlow: 'rgba(169, 223, 191, 0.25)' }
+      purple: isLight 
+        ? { brand: '#4f46e5', hover: '#4338ca', rgb: '79, 70, 229', glow: 'rgba(79, 70, 229, 0.15)', borderGlow: 'rgba(79, 70, 229, 0.25)' }
+        : { brand: '#6366f1', hover: '#4f46e5', rgb: '99, 102, 241', glow: 'rgba(99, 102, 241, 0.15)', borderGlow: 'rgba(99, 102, 241, 0.25)' },
+      coral: isLight
+        ? { brand: '#ef4444', hover: '#dc2626', rgb: '239, 68, 68', glow: 'rgba(239, 68, 68, 0.15)', borderGlow: 'rgba(239, 68, 68, 0.25)' }
+        : { brand: '#FF6B6B', hover: '#FF5252', rgb: '255, 107, 107', glow: 'rgba(255, 107, 107, 0.15)', borderGlow: 'rgba(255, 107, 107, 0.25)' },
+      amber: isLight
+        ? { brand: '#d97706', hover: '#b45309', rgb: '217, 119, 6', glow: 'rgba(217, 119, 6, 0.15)', borderGlow: 'rgba(217, 119, 6, 0.25)' }
+        : { brand: '#FFC300', hover: '#E6B000', rgb: '255, 195, 0', glow: 'rgba(255, 195, 0, 0.15)', borderGlow: 'rgba(255, 195, 0, 0.25)' },
+      teal: isLight
+        ? { brand: '#0d9488', hover: '#0f766e', rgb: '13, 148, 136', glow: 'rgba(13, 148, 136, 0.15)', borderGlow: 'rgba(13, 148, 136, 0.25)' }
+        : { brand: '#2EC4B6', hover: '#259E92', rgb: '46, 196, 182', glow: 'rgba(46, 196, 182, 0.15)', borderGlow: 'rgba(46, 196, 182, 0.25)' },
+      plains: isLight
+        ? { brand: '#059669', hover: '#047857', rgb: '5, 150, 105', glow: 'rgba(5, 150, 105, 0.15)', borderGlow: 'rgba(5, 150, 105, 0.25)' }
+        : { brand: '#A9DFBF', hover: '#8FD4A8', rgb: '169, 223, 191', glow: 'rgba(169, 223, 191, 0.15)', borderGlow: 'rgba(169, 223, 191, 0.25)' }
     }[activeTheme];
 
     if (colors) {
@@ -111,11 +137,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       root.style.setProperty('--border-color-glow', colors.borderGlow);
       root.style.setProperty('--shadow-glow', `0 0 20px 0 ${colors.glow}`);
     }
-  }, [activeTheme]);
+  }, [activeTheme, activeMode]);
 
   const updateTheme = (theme: 'purple' | 'coral' | 'amber' | 'teal' | 'plains') => {
     setActiveTheme(theme);
     localStorage.setItem('workspace_theme', theme);
+  };
+  
+  const updateMode = (mode: 'dark' | 'light') => {
+    setActiveMode(mode);
+    localStorage.setItem('workspace_mode', mode);
   };
 
   // 1. Initial Load: Load sources, main chat and keys from sessionStorage/IndexedDB
@@ -670,7 +701,9 @@ ${docContext}
       isInlineViewerOpen,
       setIsInlineViewerOpen,
       activeTheme,
-      updateTheme
+      updateTheme,
+      activeMode,
+      updateMode
     }}>
       {children}
     </WorkspaceContext.Provider>

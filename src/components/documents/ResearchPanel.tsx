@@ -309,13 +309,33 @@ export const ResearchPanel: React.FC = () => {
           font-weight: 700;
         }
         .limit-selector input[type=range] {
+          -webkit-appearance: none;
           width: 100%;
-          accent-color: var(--color-brand);
+          background: transparent;
+        }
+        .limit-selector input[type=range]::-webkit-slider-runnable-track {
+          width: 100%;
+          height: 6px;
+          background: var(--bg-surface);
+          border: 1px solid var(--border-color);
+          border-radius: 3px;
+        }
+        .limit-selector input[type=range]::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          height: 16px;
+          width: 16px;
+          border-radius: 50%;
+          background: var(--color-brand);
+          margin-top: -6px;
+          box-shadow: 0 0 8px var(--color-brand-glow);
           cursor: pointer;
         }
-        .limit-selector input[type=range]:disabled {
+        .limit-selector input[type=range]:disabled::-webkit-slider-thumb {
           opacity: 0.5;
           cursor: not-allowed;
+        }
+        .limit-selector input[type=range]:disabled::-webkit-slider-runnable-track {
+          opacity: 0.5;
         }
 
         .error-text {

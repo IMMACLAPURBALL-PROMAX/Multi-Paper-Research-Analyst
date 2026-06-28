@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useWorkspace } from '@/context/WorkspaceContext';
 import { GitFork, Sparkles, RefreshCw, Layers, ZoomIn, ZoomOut, Download, Maximize2, Trash2, AlertCircle } from 'lucide-react';
 import mermaid from 'mermaid';
+import jsPDF from 'jspdf';
 
 // Unique counter to prevent ID collisions in Mermaid renders
 let renderIdCounter = 0;
@@ -204,22 +205,54 @@ CRITICAL INSTRUCTIONS:
     setIsDragging(false);
   };
 
-  const handleDownloadSvg = () => {
+  const handleDownloadPdf = () => {
     if (!canvasRef.current) return;
     const svgEl = canvasRef.current.querySelector('svg');
     if (!svgEl) return;
     
-    const svgData = new XMLSerializer().serializeToString(svgEl);
-    const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
+    const clone = svgEl.cloneNode(true) as SVGSVGElement;
+    clone.removeAttribute('style');
+    clone.removeAttribute('width');
+    clone.removeAttribute('height');
+
+    const svgData = new XMLSerializer().serializeToString(clone);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
     
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `mindmap-${Date.now()}.svg`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    img.onload = () => {
+      // Use higher scale for crisp resolution
+      const scale = 3;
+      // Intrinsic width and height from SVG bounding box, or fallback
+      const rect = svgEl.getBoundingClientRect();
+      const baseWidth = clone.viewBox.baseVal.width || rect.width || 800;
+      const baseHeight = clone.viewBox.baseVal.height || rect.height || 600;
+
+      canvas.width = baseWidth * scale;
+      canvas.height = baseHeight * scale;
+      
+      if (ctx) {
+        ctx.scale(scale, scale);
+        // Fill dark background to match the theme
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, baseWidth, baseHeight);
+        ctx.drawImage(img, 0, 0, baseWidth, baseHeight);
+        
+        const imgData = canvas.toDataURL('image/png', 1.0);
+        
+        const orientation = baseWidth > baseHeight ? 'l' : 'p';
+        const pdf = new jsPDF({
+          orientation: orientation,
+          unit: 'px',
+          format: [baseWidth, baseHeight]
+        });
+        
+        pdf.addImage(imgData, 'PNG', 0, 0, baseWidth, baseHeight);
+        pdf.save(`mindmap-${Date.now()}.pdf`);
+      }
+    };
+    
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
   };
 
   return (
@@ -256,20 +289,12 @@ CRITICAL INSTRUCTIONS:
         {trustedSources.length > 0 && hasKeys && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <select 
+              className="pdf-selector"
               value={targetPdfId} 
               onChange={(e) => setTargetPdfId(e.target.value)}
-              style={{
-                background: 'rgba(15, 23, 42, 0.4)',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-primary)',
-                padding: '6px 10px',
-                borderRadius: 'var(--radius-md)',
-                fontSize: '12px',
-                outline: 'none'
-              }}
             >
               {trustedSources.map(doc => (
-                <option key={doc.id} value={doc.id} style={{ background: '#0f172a', color: '#fff' }}>
+                <option key={doc.id} value={doc.id}>
                   {doc.title.length > 25 ? doc.title.substring(0, 25) + '...' : doc.title}
                 </option>
               ))}
@@ -365,7 +390,7 @@ CRITICAL INSTRUCTIONS:
               <button onClick={() => { setZoomLevel(1); setPan({x:0, y:0}); }} title="Reset Zoom">
                 <Maximize2 size={14} />
               </button>
-              <button onClick={handleDownloadSvg} title="Download SVG">
+              <button onClick={handleDownloadPdf} title="Download PDF">
                 <Download size={14} />
               </button>
               <button onClick={() => setMermaidCode('')} title="Reset Canvas">

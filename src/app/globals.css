@@ -13,6 +13,22 @@
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
+}
+
+body.light-mode {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-surface: #f1f5f9;
+  --bg-glass: rgba(255, 255, 255, 0.75);
+  
+  --border-color: rgba(148, 163, 184, 0.3);
+  
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+}
+
+:root {
   
   --color-brand: #6366f1; /* Indigo Accent */
   --color-brand-rgb: 99, 102, 241;
@@ -247,4 +263,22 @@ button {
 .badge-muted {
   background: rgba(148, 163, 184, 0.08);
   color: var(--text-secondary);
+}
+
+/* PDF Selector Standardized Style */
+.pdf-selector {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  outline: none;
+  font-family: var(--font-sans);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.pdf-selector:hover, .pdf-selector:focus {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 8px var(--color-brand-glow);
 }

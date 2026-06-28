@@ -98,18 +98,11 @@ export const DocumentViewer: React.FC = () => {
         
         <div className="header-actions" style={{ flex: 1, justifyContent: 'flex-end', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <select 
+            className="pdf-selector"
             value={selectedViewerDocId || ''} 
             onChange={(e) => setSelectedViewerDocId(e.target.value)}
             disabled={trustedSources.length === 0}
-            style={{
-              padding: '6px 12px',
-              borderRadius: 'var(--radius-sm)',
-              background: 'var(--bg-secondary)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-color)',
-              outline: 'none',
-              maxWidth: '300px'
-            }}
+            style={{ maxWidth: '300px' }}
           >
             {trustedSources.length > 0 ? trustedSources.map(doc => (
               <option key={doc.id} value={doc.id}>{doc.title}</option>
