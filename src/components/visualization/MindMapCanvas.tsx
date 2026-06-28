@@ -103,112 +103,6 @@ export const MindMapCanvas: React.FC = () => {
     };
   }, [mermaidCode]);
 
-  const generateMindMap = async () => {
-    const sourcesToUse = targetPdfId === 'all' ? trustedSources : trustedSources.filter(s => s.id === targetPdfId);
-    if (sourcesToUse.length === 0) return;
-    setIsLoading(true);
-    setError(null);
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (apiKeys.gemini) headers['x-gemini-key'] = apiKeys.gemini;
-    if (apiKeys.claude) headers['x-anthropic-key'] = apiKeys.claude;
-    if (apiKeys.openai) headers['x-openai-key'] = apiKeys.openai;
-
-    // Create a corpus summary for the LLM
-    let corpusSummary = '';
-    for (let idx = 0; idx < sourcesToUse.length; idx++) {
-      const doc = sourcesToUse[idx];
-      let abstractText = doc.abstract;
-      
-      // Fallback: If abstract is empty or missing, fetch the first 3 chunks as a pseudo-abstract
-      if (!abstractText || abstractText.trim() === '') {
-        try {
-          const res = await fetch(`/api/chunks/${doc.id}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.chunks && data.chunks.length > 0) {
-              abstractText = data.chunks.slice(0, 3).map((c: any) => c.content).join('\n...\n');
-            }
-          }
-        } catch (e) {
-          console.error("Failed to fetch fallback chunks for", doc.title);
-        }
-      }
-      
-      corpusSummary += `Paper [${idx + 1}]: "${doc.title}"\nAbstract/Summary: ${abstractText || 'Not available'}\nAuthors: ${doc.authors.join(', ')}\n\n`;
-    }
-
-    const prompt = `You are a research visualization expert. Analyze the following academic papers' abstracts and generate a highly detailed mind map representing the key connections, main themes, methodologies, and findings.
-The full text/abstracts of the papers have already been provided to you below as plain text. Do not ask to read the PDF files or say you cannot access files. Read the text provided below.
-
-Papers:
-${corpusSummary}
-
-CRITICAL INSTRUCTIONS:
-1. Return the output strictly as a Mermaid.js mindmap syntax.
-2. The code block must start with "mindmap" on its own line.
-3. DO NOT CREATE A SIMPLISTIC 4-BRANCH MAP. You MUST break down the concepts deeply. Create at least 15-20 distinct nodes branching out from the root.
-4. Keep labels short and concise (1-4 words per node).
-5. If the provided abstract text is extremely short or lacks sufficient detail, DO NOT hallucinate or use outside knowledge. Generate a single node that says "Insufficient Data for Mindmap".
-6. Use standard indents (2 spaces per level) to define relationships.
-7. Do not include extra comments, markdown formatting, or HTML tags inside the mindmap block.
-8. Return ONLY the mermaid code block inside a \`\`\`mermaid codeblock.
-
-Example output format:
-\`\`\`mermaid
-mindmap
-  root((Multi-Paper Synthesis))
-    Theme A
-      Subtopic 1
-      Subtopic 2
-    Theme B
-      Methodology X
-      Finding Y
-\`\`\`
-`;
-
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          messages: [{ sender: 'user', content: prompt }],
-          provider: modelConfig.provider,
-          model: modelConfig.model
-        })
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate mind map.');
-      }
-
-      // Extract mermaid block
-      const content = data.content;
-      const mermaidMatch = content.match(/```mermaid\s*([\s\S]*?)\s*```/) || 
-                           content.match(/```\s*mindmap\s*([\s\S]*?)\s*```/) ||
-                           [null, content];
-                           
-      let extractedCode = mermaidMatch[1]?.trim() || content.trim();
-      
-      // Clean up any lingering markdown code block markers
-      extractedCode = extractedCode.replace(/```mermaid/gi, '').replace(/```mindmap/gi, '').replace(/```/g, '').trim();
-
-      // Ensure it starts with mindmap
-      if (!extractedCode.startsWith('mindmap')) {
-        extractedCode = 'mindmap\n' + extractedCode;
-      }
-
-      setMermaidCode(extractedCode);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Failed to synthesize papers into a mind map.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const generateDeepMindMap = async () => {
     const sourcesToUse = targetPdfId === 'all' ? trustedSources : trustedSources.filter(s => s.id === targetPdfId);
@@ -380,15 +274,7 @@ CRITICAL INSTRUCTIONS:
                 </option>
               ))}
             </select>
-            <button 
-              className="btn-sync" 
-              onClick={generateMindMap} 
-              disabled={isLoading}
-              title="Generate a quick map using only abstracts (Low Token)"
-            >
-              <RefreshCw size={13} className={isLoading && !isDeepLoading ? 'spin-anim' : ''} />
-              <span>{mermaidCode ? 'Re-sync Quick Map' : 'Quick Map'}</span>
-            </button>
+
             <button 
               className="btn-sync" 
               style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#fbbf24', borderColor: 'rgba(234, 179, 8, 0.3)' }}
@@ -420,7 +306,7 @@ CRITICAL INSTRUCTIONS:
         {!isLoading && error && (
           <div className="canvas-error animate-fade-in">
             <p className="error-msg">{error}</p>
-            <button className="btn-secondary" onClick={generateMindMap}>Try Again</button>
+            <button className="btn-secondary" onClick={generateDeepMindMap}>Try Again</button>
           </div>
         )}
 
@@ -438,9 +324,9 @@ CRITICAL INSTRUCTIONS:
             ) : !hasKeys ? (
               <span className="badge badge-muted">Configure API Keys to activate</span>
             ) : (
-              <button className="btn-primary" onClick={generateMindMap}>
+              <button className="btn-primary" onClick={generateDeepMindMap}>
                 <Sparkles size={13} />
-                <span>Generate Mind Map</span>
+                <span>Deep Synthesis</span>
               </button>
             )}
           </div>
